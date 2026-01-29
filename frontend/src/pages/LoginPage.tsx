@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Wrench, Eye, EyeOff, Sun, Moon } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Button } from '@/components/ui/button'
@@ -52,12 +52,14 @@ export default function LoginPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-center px-16 text-white">
           <div className="flex items-center gap-4 mb-8">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-              <Wrench className="h-8 w-8" />
-            </div>
+            <img
+              src="/assets/logoGIO.png"
+              alt="Logo GIO"
+              className="h-16 w-16 object-contain"
+            />
             <div>
-              <h1 className="text-3xl font-bold tracking-wide">ASSISTENCIA</h1>
-              <p className="text-sm tracking-[0.3em] opacity-80">TECNICA</p>
+              <h1 className="text-3xl font-bold tracking-wide">ASSISTÊNCIA</h1>
+              <p className="text-sm tracking-[0.3em] opacity-80">TÉCNICA</p>
             </div>
           </div>
 
@@ -66,24 +68,9 @@ export default function LoginPage() {
           </h2>
 
           <p className="text-lg opacity-90 max-w-md">
-            Gerencie chamados de assistencia tecnica com eficiencia.
-            Acompanhe SLAs, atribua tecnicos e mantenha seus clientes satisfeitos.
+            Gerencie chamados de assistência técnica com eficiência.
+            Acompanhe SLAs, atribua técnicos e mantenha seus clientes satisfeitos.
           </p>
-
-          <div className="mt-12 flex gap-8">
-            <div>
-              <p className="text-4xl font-bold">15+</p>
-              <p className="text-sm opacity-80">Chamados Ativos</p>
-            </div>
-            <div>
-              <p className="text-4xl font-bold">5</p>
-              <p className="text-sm opacity-80">Empreendimentos</p>
-            </div>
-            <div>
-              <p className="text-4xl font-bold">98%</p>
-              <p className="text-sm opacity-80">SLA no Prazo</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -106,12 +93,14 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-              <Wrench className="h-6 w-6 text-white" />
-            </div>
+            <img
+              src="/assets/logoGIO.png"
+              alt="Logo GIO"
+              className="h-12 w-12 object-contain"
+            />
             <div>
-              <h1 className="text-xl font-bold tracking-wide text-foreground">ASSISTENCIA</h1>
-              <p className="text-[10px] tracking-[0.2em] text-muted-foreground">TECNICA</p>
+              <h1 className="text-xl font-bold tracking-wide text-foreground">ASSISTÊNCIA</h1>
+              <p className="text-[10px] tracking-[0.2em] text-muted-foreground">TÉCNICA</p>
             </div>
           </div>
 

@@ -159,7 +159,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-muted-foreground">
-            Visao geral dos chamados de assistencia tecnica
+            Visão geral dos chamados de assistência técnica
           </p>
         </div>
         {canCreateChamado() && (

@@ -785,7 +785,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                   {[
                     { nome: 'Laudo_Tecnico_276.pdf', tamanho: '245 KB', tipo: 'pdf' },
                     { nome: 'Fotos_Vistoria.zip', tamanho: '3.2 MB', tipo: 'zip' },
-                    { nome: 'Orcamento_Materiais.xlsx', tamanho: '28 KB', tipo: 'excel' },
+                    { nome: 'Orçamento_Materiais.xlsx', tamanho: '28 KB', tipo: 'excel' },
                   ].map((arquivo, index) => (
                     <div key={index} className="flex items-center gap-3 p-3 bg-card border rounded-lg hover:border-sidebar-accent/50 transition-colors">
                       <FileText className={cn(
