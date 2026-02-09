@@ -380,4 +380,4 @@ O sistema utiliza **SQLite** via **sql.js** com TypeORM, sem necessidade de serv
 
 ---
 
-Desenvolvido para **GIO Empreendimentos**
+Desenvolvido por **GIO**
