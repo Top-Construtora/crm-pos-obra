@@ -61,6 +61,58 @@ export interface Comentario {
   criadoEm: string;
 }
 
+// Vistoria
+export interface Vistoria {
+  id: string;
+  chamadoId: string;
+  dataVistoria?: string;
+  horaInicio?: string;
+  horaTermino?: string;
+  tecnicoPresente?: string;
+  causaIdentificada?: string;
+  parecerTecnico?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+// Material
+export interface Material {
+  id: string;
+  chamadoId: string;
+  nome: string;
+  quantidade: number;
+  valorUnitario: number;
+  aprovado: boolean;
+  criadoEm: string;
+}
+
+// Anexo
+export interface Anexo {
+  id: string;
+  chamadoId: string;
+  nomeOriginal: string;
+  nomeArquivo: string;
+  tamanho: number;
+  tipo: string;
+  usuarioId: string;
+  usuario?: User;
+  criadoEm: string;
+}
+
+// Notificacao
+export type NotificacaoTipo = 'NOVO_CHAMADO' | 'STATUS_ALTERADO' | 'ATRIBUICAO' | 'COMENTARIO' | 'SLA_ALERTA';
+
+export interface Notificacao {
+  id: string;
+  usuarioId: string;
+  tipo: NotificacaoTipo;
+  titulo: string;
+  mensagem: string;
+  lida: boolean;
+  chamadoId?: string;
+  criadoEm: string;
+}
+
 // Chamado
 export interface Chamado {
   id: string;
@@ -81,11 +133,16 @@ export interface Chamado {
   responsavel?: User;
   criadoPorId: string;
   criadoPor?: User;
+  horasEstimadas?: number;
+  equipeNecessaria?: string;
   criadoEm: string;
   atualizadoEm: string;
   finalizadoEm?: string;
   historico?: Historico[];
   comentarios?: Comentario[];
+  vistoria?: Vistoria;
+  materiais?: Material[];
+  anexos?: Anexo[];
   slaInfo?: SLAInfo;
 }
 
@@ -129,6 +186,11 @@ export interface ChamadoFilters {
   responsavelId?: string;
   prioridade?: Prioridade;
   busca?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  slaStatus?: 'VENCIDO' | 'PROXIMO' | 'OK';
+  page?: number;
+  limit?: number;
 }
 
 // Dados para criação/edição
@@ -144,6 +206,23 @@ export interface ChamadoInput {
   prioridade: Prioridade;
   slaHoras: number;
   responsavelId?: string;
+  horasEstimadas?: number;
+  equipeNecessaria?: string;
+}
+
+export interface VistoriaInput {
+  dataVistoria?: string;
+  horaInicio?: string;
+  horaTermino?: string;
+  tecnicoPresente?: string;
+  causaIdentificada?: string;
+  parecerTecnico?: string;
+}
+
+export interface MaterialInput {
+  nome: string;
+  quantidade: number;
+  valorUnitario: number;
 }
 
 export interface EmpreendimentoInput {

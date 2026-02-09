@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
 import { chamadosService } from '@/services/chamados.service'
+import { ClassificacaoAutomatica } from '@/components/chamados/ClassificacaoAutomatica'
 import { empreendimentosService } from '@/services/empreendimentos.service'
 import { usersService } from '@/services/users.service'
 import { Button } from '@/components/ui/button'
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import {
   TipoImovel,
   Categoria,
@@ -30,12 +32,26 @@ import {
   PRIORIDADE_LABELS,
 } from '@/types'
 
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length <= 2) return digits.length ? `(${digits}` : ''
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
 const chamadoSchema = z.object({
-  empreendimentoId: z.string().min(1, 'Empreendimento e obrigatorio'),
-  unidade: z.string().min(1, 'Unidade e obrigatoria'),
-  clienteNome: z.string().min(1, 'Nome do cliente e obrigatorio'),
-  clienteTelefone: z.string().min(1, 'Telefone e obrigatorio'),
-  clienteEmail: z.string().email('Email invalido').optional().or(z.literal('')),
+  empreendimentoId: z.string().min(1, 'Selecione um empreendimento'),
+  unidade: z.string().min(1, 'Informe a unidade (apto/casa)'),
+  clienteNome: z.string().min(2, 'Nome do cliente deve ter pelo menos 2 caracteres'),
+  clienteTelefone: z
+    .string()
+    .min(1, 'Informe o telefone do cliente')
+    .regex(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Formato invalido. Use: (00) 00000-0000'),
+  clienteEmail: z
+    .string()
+    .email('Formato de email invalido')
+    .optional()
+    .or(z.literal('')),
   tipo: z.enum(['RESIDENCIAL', 'COMERCIAL']),
   categoria: z.enum([
     'HIDRAULICA',
@@ -46,7 +62,7 @@ const chamadoSchema = z.object({
     'ESTRUTURAL',
     'OUTROS',
   ]),
-  descricao: z.string().min(10, 'Descricao deve ter pelo menos 10 caracteres'),
+  descricao: z.string().min(10, 'Descreva o problema com pelo menos 10 caracteres'),
   prioridade: z.enum(['BAIXA', 'MEDIA', 'ALTA', 'URGENTE']),
   slaHoras: z.coerce.number().min(1, 'SLA deve ser maior que 0'),
   responsavelId: z.string().optional(),
@@ -212,7 +228,12 @@ export default function ChamadoFormPage() {
 
             <div className="space-y-2">
               <Label htmlFor="unidade">Unidade (Apto/Casa) *</Label>
-              <Input id="unidade" {...register('unidade')} placeholder="Ex: Apto 101" />
+              <Input
+                id="unidade"
+                {...register('unidade')}
+                placeholder="Ex: Apto 101"
+                className={cn(errors.unidade && 'border-destructive focus-visible:ring-destructive')}
+              />
               {errors.unidade && (
                 <p className="text-sm text-destructive">{errors.unidade.message}</p>
               )}
@@ -220,7 +241,11 @@ export default function ChamadoFormPage() {
 
             <div className="space-y-2">
               <Label htmlFor="clienteNome">Nome do Cliente *</Label>
-              <Input id="clienteNome" {...register('clienteNome')} />
+              <Input
+                id="clienteNome"
+                {...register('clienteNome')}
+                className={cn(errors.clienteNome && 'border-destructive focus-visible:ring-destructive')}
+              />
               {errors.clienteNome && (
                 <p className="text-sm text-destructive">{errors.clienteNome.message}</p>
               )}
@@ -228,7 +253,13 @@ export default function ChamadoFormPage() {
 
             <div className="space-y-2">
               <Label htmlFor="clienteTelefone">Telefone *</Label>
-              <Input id="clienteTelefone" {...register('clienteTelefone')} placeholder="(00) 00000-0000" />
+              <Input
+                id="clienteTelefone"
+                placeholder="(00) 00000-0000"
+                value={watch('clienteTelefone') || ''}
+                onChange={(e) => setValue('clienteTelefone', formatPhone(e.target.value), { shouldValidate: true })}
+                className={cn(errors.clienteTelefone && 'border-destructive focus-visible:ring-destructive')}
+              />
               {errors.clienteTelefone && (
                 <p className="text-sm text-destructive">{errors.clienteTelefone.message}</p>
               )}
@@ -236,7 +267,12 @@ export default function ChamadoFormPage() {
 
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="clienteEmail">Email</Label>
-              <Input id="clienteEmail" type="email" {...register('clienteEmail')} />
+              <Input
+                id="clienteEmail"
+                type="email"
+                {...register('clienteEmail')}
+                className={cn(errors.clienteEmail && 'border-destructive focus-visible:ring-destructive')}
+              />
               {errors.clienteEmail && (
                 <p className="text-sm text-destructive">{errors.clienteEmail.message}</p>
               )}
@@ -357,6 +393,19 @@ export default function ChamadoFormPage() {
                 <p className="text-sm text-destructive">{errors.descricao.message}</p>
               )}
             </div>
+
+            {!isEditing && (
+              <div className="sm:col-span-2">
+                <ClassificacaoAutomatica
+                  descricao={watch('descricao') || ''}
+                  onAplicar={(dados) => {
+                    setValue('categoria', dados.categoria);
+                    setValue('prioridade', dados.prioridade);
+                    setValue('slaHoras', dados.slaHoras);
+                  }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 

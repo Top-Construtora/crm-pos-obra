@@ -14,6 +14,8 @@ export type Categoria =
   | 'ESTRUTURAL'
   | 'OUTROS';
 export type HistoricoTipo = 'CRIACAO' | 'STATUS' | 'RESPONSAVEL' | 'EDICAO' | 'COMENTARIO';
+export type NotificacaoTipo = 'NOVO_CHAMADO' | 'STATUS_ALTERADO' | 'ATRIBUICAO' | 'COMENTARIO' | 'SLA_ALERTA';
+export type StatusAtendimento = 'AGENDADO' | 'EM_ROTA' | 'NO_LOCAL' | 'CONCLUIDO' | 'CANCELADO';
 
 export interface AuthRequest extends Request {
   user?: User;

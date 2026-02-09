@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AppDataSource } from '../database/data-source.js';
 import { Empreendimento } from '../entities/Empreendimento.js';
 import { authMiddleware, requireRoles } from '../middlewares/auth.middleware.js';
+import { obrasSupabaseService } from '../services/obrasSupabase.service.js';
 
 const router = Router();
 const empreendimentoRepository = AppDataSource.getRepository(Empreendimento);
@@ -9,13 +10,20 @@ const empreendimentoRepository = AppDataSource.getRepository(Empreendimento);
 // Aplicar auth em todas as rotas
 router.use(authMiddleware);
 
-// GET /api/empreendimentos
+// GET /api/empreendimentos - Busca direto do Supabase
 router.get('/', async (_req, res: Response) => {
   try {
-    const empreendimentos = await empreendimentoRepository.find({
-      where: { ativo: true },
-      order: { nome: 'ASC' },
-    });
+    const obras = await obrasSupabaseService.listarObrasAtivas();
+
+    // Mapear para o formato esperado pelo frontend
+    const empreendimentos = obras.map(obra => ({
+      id: obra.id,
+      nome: obra.nome_limpo || obra.nome,
+      endereco: obra.endereco || '',
+      ativo: obra.ativo !== false,
+      criadoEm: obra.created_at,
+      atualizadoEm: obra.updated_at,
+    }));
 
     res.json(empreendimentos);
   } catch (error) {
@@ -24,16 +32,24 @@ router.get('/', async (_req, res: Response) => {
   }
 });
 
-// GET /api/empreendimentos/:id
+// GET /api/empreendimentos/:id - Busca direto do Supabase
 router.get('/:id', async (req, res: Response) => {
   try {
-    const empreendimento = await empreendimentoRepository.findOne({
-      where: { id: req.params.id },
-    });
+    const obra = await obrasSupabaseService.buscarObraPorId(req.params.id);
 
-    if (!empreendimento) {
+    if (!obra) {
       return res.status(404).json({ error: 'Empreendimento não encontrado' });
     }
+
+    // Mapear para o formato esperado pelo frontend
+    const empreendimento = {
+      id: obra.id,
+      nome: obra.nome_limpo || obra.nome,
+      endereco: obra.endereco || '',
+      ativo: obra.ativo !== false,
+      criadoEm: obra.created_at,
+      atualizadoEm: obra.updated_at,
+    };
 
     res.json(empreendimento);
   } catch (error) {
@@ -42,75 +58,28 @@ router.get('/:id', async (req, res: Response) => {
   }
 });
 
-// POST /api/empreendimentos
-router.post('/', requireRoles('ADMIN'), async (req, res: Response) => {
-  try {
-    const { nome, endereco } = req.body;
+// POST, PUT e DELETE desabilitados - Os empreendimentos são gerenciados diretamente no Supabase
+// Se necessário gerenciar empreendimentos, faça diretamente na tabela obras_top do Supabase
 
-    if (!nome || !endereco) {
-      return res.status(400).json({ error: 'Nome e endereço são obrigatórios' });
-    }
-
-    const empreendimento = empreendimentoRepository.create({
-      nome,
-      endereco,
-      ativo: true,
-    });
-
-    await empreendimentoRepository.save(empreendimento);
-
-    res.status(201).json(empreendimento);
-  } catch (error) {
-    console.error('Create empreendimento error:', error);
-    res.status(500).json({ error: 'Erro ao criar empreendimento' });
-  }
+// POST /api/empreendimentos - DESABILITADO (gerenciar no Supabase)
+router.post('/', requireRoles('ADMIN'), async (_req, res: Response) => {
+  res.status(403).json({
+    error: 'Empreendimentos são gerenciados diretamente no Supabase. Acesse o painel do Supabase para criar novos empreendimentos.'
+  });
 });
 
-// PUT /api/empreendimentos/:id
-router.put('/:id', requireRoles('ADMIN'), async (req, res: Response) => {
-  try {
-    const empreendimento = await empreendimentoRepository.findOne({
-      where: { id: req.params.id },
-    });
-
-    if (!empreendimento) {
-      return res.status(404).json({ error: 'Empreendimento não encontrado' });
-    }
-
-    const { nome, endereco, ativo } = req.body;
-
-    if (nome) empreendimento.nome = nome;
-    if (endereco) empreendimento.endereco = endereco;
-    if (typeof ativo === 'boolean') empreendimento.ativo = ativo;
-
-    await empreendimentoRepository.save(empreendimento);
-
-    res.json(empreendimento);
-  } catch (error) {
-    console.error('Update empreendimento error:', error);
-    res.status(500).json({ error: 'Erro ao atualizar empreendimento' });
-  }
+// PUT /api/empreendimentos/:id - DESABILITADO (gerenciar no Supabase)
+router.put('/:id', requireRoles('ADMIN'), async (_req, res: Response) => {
+  res.status(403).json({
+    error: 'Empreendimentos são gerenciados diretamente no Supabase. Acesse o painel do Supabase para editar empreendimentos.'
+  });
 });
 
-// DELETE /api/empreendimentos/:id (soft delete)
-router.delete('/:id', requireRoles('ADMIN'), async (req, res: Response) => {
-  try {
-    const empreendimento = await empreendimentoRepository.findOne({
-      where: { id: req.params.id },
-    });
-
-    if (!empreendimento) {
-      return res.status(404).json({ error: 'Empreendimento não encontrado' });
-    }
-
-    empreendimento.ativo = false;
-    await empreendimentoRepository.save(empreendimento);
-
-    res.json({ message: 'Empreendimento desativado com sucesso' });
-  } catch (error) {
-    console.error('Delete empreendimento error:', error);
-    res.status(500).json({ error: 'Erro ao desativar empreendimento' });
-  }
+// DELETE /api/empreendimentos/:id - DESABILITADO (gerenciar no Supabase)
+router.delete('/:id', requireRoles('ADMIN'), async (_req, res: Response) => {
+  res.status(403).json({
+    error: 'Empreendimentos são gerenciados diretamente no Supabase. Acesse o painel do Supabase para desativar empreendimentos.'
+  });
 });
 
 export { router as empreendimentosRoutes };

@@ -2,35 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Lemon Milk';
+  src: url('/assets/fonts/LemonMilk-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
-    /* GIO Theme Colors - More Vibrant */
-    --background: 210 20% 98%;
-    --foreground: 215 28% 17%;
+    /* Minimal Theme Colors */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 215 28% 17%;
+    --card-foreground: 0 0% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 28% 17%;
-    --primary: 193 60% 29%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 174 82% 38%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 174 82% 38%;
-    --accent-foreground: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 39%;
-    --success-foreground: 0 0% 100%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 217 91% 60%;
-    --info-foreground: 0 0% 100%;
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 193 60% 29%;
-    --radius: 0.75rem;
+    --warning-foreground: 0 0% 98%;
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 9%;
+    --radius: 0.5rem;
 
     /* Sidebar colors - Dark */
     --sidebar: 210 40% 14%;
@@ -40,25 +48,25 @@
   }
 
   .dark {
-    --background: 215 28% 10%;
-    --foreground: 210 20% 96%;
-    --card: 215 28% 13%;
-    --card-foreground: 210 20% 96%;
-    --popover: 215 28% 13%;
-    --popover-foreground: 210 20% 96%;
-    --primary: 174 82% 38%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 193 60% 29%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 215 25% 20%;
-    --muted-foreground: 215 16% 60%;
-    --accent: 174 82% 38%;
-    --accent-foreground: 0 0% 100%;
+    --background: 0 0% 9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 215 25% 22%;
-    --input: 215 25% 22%;
-    --ring: 174 82% 38%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 83%;
 
     /* Sidebar colors - same in dark mode */
     --sidebar: 215 28% 10%;
@@ -77,11 +85,8 @@
     font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
-  /* Headings use Orbitron (similar to Lemon Milk) */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', 'Inter', sans-serif;
     font-weight: 600;
-    letter-spacing: 0.5px;
   }
 }
 
@@ -112,104 +117,166 @@
   @apply bg-white/20;
 }
 
-/* Gradient backgrounds */
+/* Sidebar gradient background */
 .bg-sidebar-gradient {
   background: linear-gradient(180deg, hsl(var(--sidebar)) 0%, hsl(210 30% 18%) 100%);
 }
 
-/* Stat card highlight gradient */
-.stat-highlight {
-  background: linear-gradient(135deg, hsl(193 60% 29%) 0%, hsl(174 82% 38%) 100%);
-}
-
-/* Button primary gradient */
-.btn-gradient {
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
-  box-shadow: 0 4px 14px hsla(var(--primary), 0.3);
-}
-
-.btn-gradient:hover {
-  box-shadow: 0 6px 20px hsla(var(--primary), 0.4);
-  transform: translateY(-1px);
-}
-
-/* Priority indicator */
+/* Priority indicator - minimal */
 .priority-indicator {
   position: absolute;
   left: 0;
   top: 1rem;
   bottom: 1rem;
-  width: 4px;
-  border-radius: 0 4px 4px 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
 }
 
-.priority-high { @apply bg-red-500; }
-.priority-medium { @apply bg-amber-500; }
-.priority-low { @apply bg-emerald-500; }
+.priority-high { @apply bg-foreground; }
+.priority-medium { @apply bg-muted-foreground; }
+.priority-low { @apply bg-border; }
 
-/* Status badge colors */
-.status-aberto { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
-.status-andamento { @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
-.status-aguardando { @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400; }
-.status-finalizado { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
+/* Status badge colors - minimal */
+.status-aberto { @apply bg-muted text-foreground border border-border; }
+.status-andamento { @apply bg-muted text-foreground border border-border; }
+.status-aguardando { @apply bg-muted text-foreground border border-border; }
+.status-finalizado { @apply bg-foreground text-background; }
 
-/* SLA badge colors */
-.sla-ok { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
-.sla-warning { @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
-.sla-danger { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+/* SLA badge colors - minimal */
+.sla-ok { @apply bg-muted text-foreground border border-border; }
+.sla-warning { @apply bg-muted text-foreground border border-border; }
+.sla-danger { @apply bg-destructive text-destructive-foreground; }
 
-/* Column dots */
-.column-dot-aberto { @apply bg-red-500; }
-.column-dot-andamento { @apply bg-amber-500; }
-.column-dot-aguardando { @apply bg-blue-500; }
-.column-dot-finalizado { @apply bg-emerald-500; }
+/* Column dots - minimal */
+.column-dot-aberto { @apply bg-border; }
+.column-dot-andamento { @apply bg-muted-foreground; }
+.column-dot-aguardando { @apply bg-border; }
+.column-dot-finalizado { @apply bg-foreground; }
 
-/* Tag styles */
-.tag-comercial { @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400; }
-.tag-residencial { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
-.tag-urgente { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+/* Tag styles - minimal */
+.tag-comercial { @apply bg-muted text-foreground border border-border; }
+.tag-residencial { @apply bg-muted text-foreground border border-border; }
+.tag-urgente { @apply bg-destructive text-destructive-foreground; }
 
 /* Card enhancements */
 .card-hover {
-  @apply transition-all duration-200;
+  @apply transition-colors duration-150;
 }
 .card-hover:hover {
-  @apply shadow-lg border-primary/30;
-  transform: translateY(-2px);
+  @apply bg-muted/30;
 }
 
 /* Header title font */
 .header-title {
-  font-family: 'Orbitron', sans-serif;
-  font-weight: 600;
+  font-family: 'Lemon Milk', sans-serif;
+  font-weight: 400;
   letter-spacing: 1px;
 }
 
 /* Logo text */
 .logo-text {
-  font-family: 'Orbitron', sans-serif;
-  font-weight: 700;
+  font-family: 'Lemon Milk', sans-serif;
+  font-weight: 400;
   letter-spacing: 1px;
 }
 
-/* Accent text gradient */
-.text-gradient {
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Glass effect for cards */
-.glass-card {
-  @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm;
-}
-
-/* Vibrant background for main content */
+/* Minimal background for main content */
 .main-bg {
-  background: linear-gradient(135deg, hsl(210 20% 98%) 0%, hsl(210 25% 95%) 100%);
+  @apply bg-background;
 }
 
-.dark .main-bg {
-  background: linear-gradient(135deg, hsl(215 28% 10%) 0%, hsl(215 30% 8%) 100%);
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  /* Touch-friendly buttons */
+  button, [role="button"], a {
+    min-height: 44px;
+  }
+
+  /* Small buttons exception */
+  .h-6, .h-7, .h-8 {
+    min-height: auto;
+  }
+
+  /* Kanban horizontal scroll */
+  .kanban-columns {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .kanban-columns > * {
+    scroll-snap-align: start;
+    min-width: 280px;
+    flex-shrink: 0;
+  }
+
+  /* Stats strip horizontal scroll */
+  .stats-strip {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .stats-strip > * {
+    scroll-snap-align: start;
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  /* Hide scrollbar for mobile horizontal scrolls */
+  .kanban-columns::-webkit-scrollbar,
+  .stats-strip::-webkit-scrollbar {
+    height: 0;
+    display: none;
+  }
+}
+
+/* Bottom navigation bar for mobile */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 64px;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: hsl(var(--card));
+  border-top: 1px solid hsl(var(--border));
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.dark .bottom-nav {
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  font-weight: 500;
+  min-height: 44px;
+}
+
+.bottom-nav-item.active {
+  color: hsl(var(--primary));
+}
+
+.bottom-nav-item.active svg {
+  color: hsl(var(--primary));
 }

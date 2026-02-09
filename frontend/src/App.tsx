@@ -10,6 +10,11 @@ import ChamadoDetalhesPage from '@/pages/ChamadoDetalhesPage'
 import AssistenciaTecnicaPage from '@/pages/AssistenciaTecnicaPage'
 import EmpreendimentosPage from '@/pages/EmpreendimentosPage'
 import TecnicosPage from '@/pages/TecnicosPage'
+import ProfilePage from '@/pages/ProfilePage'
+import ConfiguracoesPage from '@/pages/ConfiguracoesPage'
+import PortalClientePage from '@/pages/PortalClientePage'
+import AgendaTecnicaPage from '@/pages/AgendaTecnicaPage'
+import RelatoriosPage from '@/pages/RelatoriosPage'
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -31,6 +36,9 @@ function App() {
         }
       />
 
+      {/* Rota pública para portal do cliente */}
+      <Route path="/portal-cliente" element={<PortalClientePage />} />
+
       <Route
         element={
           <ProtectedRoute>
@@ -46,6 +54,10 @@ function App() {
         <Route path="chamados/:id/editar" element={<ChamadoFormPage />} />
         <Route path="empreendimentos" element={<EmpreendimentosPage />} />
         <Route path="tecnicos" element={<TecnicosPage />} />
+        <Route path="perfil" element={<ProfilePage />} />
+        <Route path="configuracoes" element={<ConfiguracoesPage />} />
+        <Route path="agenda" element={<AgendaTecnicaPage />} />
+        <Route path="relatorios" element={<RelatoriosPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

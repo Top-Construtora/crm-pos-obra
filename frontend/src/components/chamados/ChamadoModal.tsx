@@ -21,9 +21,6 @@ import {
   User,
   AlertTriangle,
   FileText,
-  Camera,
-  Upload,
-  Download,
   ChevronDown,
   X,
   CalendarDays,
@@ -54,6 +51,11 @@ import {
 } from '@/types'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { VistoriaTab } from './tabs/VistoriaTab'
+import { MateriaisTab } from './tabs/MateriaisTab'
+import { AnexosTab } from './tabs/AnexosTab'
+import { HistoricoTab } from './tabs/HistoricoTab'
+import { exportChamadoDetailPDF } from '@/lib/export'
 
 const chamadoSchema = z.object({
   empreendimentoId: z.string().min(1, 'Selecione o empreendimento'),
@@ -583,230 +585,23 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
             )}
 
             {/* Tab: Vistoria */}
-            {activeTab === 'vistoria' && (
-              <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-6">
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                      <ClipboardCheck className="h-4 w-4 text-sidebar-accent" />
-                      Dados da Vistoria Tecnica
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Data da Vistoria
-                        </label>
-                        <Input type="date" className="mt-1.5" />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Hora de Inicio
-                        </label>
-                        <Input type="time" className="mt-1.5" />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Hora de Termino
-                        </label>
-                        <Input type="time" className="mt-1.5" />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Tecnico Presente
-                        </label>
-                        <Input className="mt-1.5" placeholder="Nome do tecnico" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-sidebar-accent" />
-                      Diagnostico Tecnico
-                    </h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Causa Identificada
-                        </label>
-                        <Textarea className="mt-1.5 min-h-[80px]" placeholder="Descreva a causa do problema..." />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Parecer Tecnico / Solucao Proposta
-                        </label>
-                        <Textarea className="mt-1.5 min-h-[100px]" placeholder="Descreva a solucao proposta..." />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                      <Camera className="h-4 w-4 text-sidebar-accent" />
-                      Registros Fotograficos
-                    </h3>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center border">
-                        <Camera className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center border">
-                        <Camera className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <button type="button" className="aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-sidebar-accent hover:text-sidebar-accent transition-colors">
-                        <Upload className="h-5 w-5 mb-1" />
-                        <span className="text-xs">Adicionar</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-sidebar-accent" />
-                      Aceite do Cliente
-                    </h3>
-                    <div className="h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-sidebar-accent hover:text-sidebar-accent transition-colors cursor-pointer">
-                      <FileText className="h-6 w-6 mb-2" />
-                      <span className="text-sm">Clique para coletar assinatura</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {activeTab === 'vistoria' && isEditing && chamadoId && (
+              <VistoriaTab chamadoId={chamadoId} />
             )}
 
             {/* Tab: Materiais */}
-            {activeTab === 'materiais' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                    <Package className="h-4 w-4 text-sidebar-accent" />
-                    Levantamento de Materiais
-                  </h3>
-                  <div className="space-y-2">
-                    {[
-                      { nome: '1 Rolo Manta Asfaltica 3mm (10m2)', valor: 'R$ 289,00', checked: true },
-                      { nome: '1 Lata Impermeabilizante Acrilico 18L', valor: 'R$ 320,00', checked: true },
-                      { nome: '1 Galao Tinta Acrilica Premium', valor: 'R$ 185,00', checked: true },
-                      { nome: 'Kit Lixa + Rolos de Pintura', valor: 'R$ 75,00', checked: false },
-                      { nome: '1 Galao Selador Acrilico 18L', valor: 'R$ 120,00', checked: false },
-                    ].map((item, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 bg-card border rounded-lg hover:border-sidebar-accent/50 transition-colors">
-                        <input type="checkbox" defaultChecked={item.checked} className="w-4 h-4 accent-sidebar-accent rounded" />
-                        <span className={cn('flex-1 text-sm', item.checked && 'line-through text-muted-foreground')}>
-                          {item.nome}
-                        </span>
-                        <span className={cn('font-semibold text-sm', item.checked ? 'text-emerald-600' : 'text-muted-foreground')}>
-                          {item.valor}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 p-4 bg-muted/30 rounded-lg border flex justify-between items-center">
-                    <span className="font-semibold">Total Estimado</span>
-                    <span className="text-xl font-bold text-primary">R$ 989,00</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                    <User className="h-4 w-4 text-sidebar-accent" />
-                    Mao de Obra
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        Horas Estimadas
-                      </label>
-                      <Input type="number" className="mt-1.5" placeholder="16" defaultValue={16} />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        Equipe Necessaria
-                      </label>
-                      <Input className="mt-1.5" placeholder="2 profissionais" defaultValue="2 profissionais" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {activeTab === 'materiais' && isEditing && chamadoId && (
+              <MateriaisTab chamadoId={chamadoId} chamado={chamado} />
             )}
 
             {/* Tab: Historico */}
-            {activeTab === 'historico' && (
-              <div>
-                <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-sidebar-accent" />
-                  Timeline de Atividades
-                </h3>
-                {isEditing && chamado?.historico && chamado.historico.length > 0 ? (
-                  <div className="relative pl-7">
-                    <div className="absolute left-[7px] top-1 bottom-1 w-0.5 bg-border" />
-                    <div className="space-y-6">
-                      {chamado.historico.map((item, index) => (
-                        <div key={item.id} className="relative">
-                          <div className={cn(
-                            'absolute -left-[21px] w-3.5 h-3.5 rounded-full border-[3px]',
-                            index === 0
-                              ? 'bg-sidebar-accent border-sidebar-accent'
-                              : 'bg-emerald-500 border-emerald-500'
-                          )} />
-                          <div className="bg-card border rounded-lg p-4">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="font-semibold text-sm">{item.descricao}</span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {format(new Date(item.criadoEm), "dd/MM/yyyy, HH:mm", { locale: ptBR })}
-                              </span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Por {item.usuario?.nome}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-16 text-muted-foreground">
-                    <Clock className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p className="text-sm">Nenhum historico disponivel</p>
-                  </div>
-                )}
-              </div>
+            {activeTab === 'historico' && isEditing && chamadoId && (
+              <HistoricoTab chamadoId={chamadoId} chamado={chamado} />
             )}
 
             {/* Tab: Anexos */}
-            {activeTab === 'anexos' && (
-              <div>
-                <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-                  <Paperclip className="h-4 w-4 text-sidebar-accent" />
-                  Documentos Anexados
-                </h3>
-                <div className="space-y-2">
-                  {[
-                    { nome: 'Laudo_Tecnico_276.pdf', tamanho: '245 KB', tipo: 'pdf' },
-                    { nome: 'Fotos_Vistoria.zip', tamanho: '3.2 MB', tipo: 'zip' },
-                    { nome: 'Orçamento_Materiais.xlsx', tamanho: '28 KB', tipo: 'excel' },
-                  ].map((arquivo, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-card border rounded-lg hover:border-sidebar-accent/50 transition-colors">
-                      <FileText className={cn(
-                        'h-5 w-5',
-                        arquivo.tipo === 'pdf' && 'text-red-500',
-                        arquivo.tipo === 'zip' && 'text-blue-500',
-                        arquivo.tipo === 'excel' && 'text-emerald-500'
-                      )} />
-                      <span className="flex-1 text-sm">{arquivo.nome}</span>
-                      <span className="text-sm text-muted-foreground">{arquivo.tamanho}</span>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <button type="button" className="w-full mt-4 py-3 border-2 border-dashed rounded-lg text-muted-foreground hover:border-sidebar-accent hover:text-sidebar-accent transition-colors flex items-center justify-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  Adicionar anexo
-                </button>
-              </div>
+            {activeTab === 'anexos' && isEditing && chamadoId && (
+              <AnexosTab chamadoId={chamadoId} />
             )}
           </div>
 
@@ -830,8 +625,12 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              {isEditing && (
-                <Button type="button" variant="outline">
+              {isEditing && chamado && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => exportChamadoDetailPDF(chamado)}
+                >
                   <Printer className="h-4 w-4 mr-2" />
                   Imprimir
                 </Button>

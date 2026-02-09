@@ -2,16 +2,16 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Eye, EyeOff, Sun, Moon } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Headset, Clock, Users } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from '@/contexts/ThemeContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 const loginSchema = z.object({
-  email: z.string().email('Email invalido'),
-  senha: z.string().min(1, 'Senha e obrigatoria'),
+  email: z.string().min(1, 'Informe seu email').email('Formato de email invalido'),
+  senha: z.string().min(1, 'Informe sua senha'),
 })
 
 type LoginForm = z.infer<typeof loginSchema>
@@ -20,7 +20,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
-  const { theme, toggleTheme } = useTheme()
 
   const {
     register,
@@ -40,150 +39,192 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-teal to-teal-light relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
-          <div className="flex items-center gap-4 mb-8">
-            <img
-              src="/assets/logoGIO.png"
-              alt="Logo GIO"
-              className="h-16 w-16 object-contain"
-            />
-            <div>
-              <h1 className="text-3xl font-bold tracking-wide">ASSISTÊNCIA</h1>
-              <p className="text-sm tracking-[0.3em] opacity-80">TÉCNICA</p>
-            </div>
-          </div>
-
-          <h2 className="text-4xl font-bold leading-tight mb-6">
-            Sistema de Controle<br />de Chamados
-          </h2>
-
-          <p className="text-lg opacity-90 max-w-md">
-            Gerencie chamados de assistência técnica com eficiência.
-            Acompanhe SLAs, atribua técnicos e mantenha seus clientes satisfeitos.
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-[#1e2938] via-[#1e6076] to-[#12b0a0] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent transform -skew-y-12 scale-150"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent transform skew-y-12 scale-150"></div>
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background relative">
-        {/* Theme Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleTheme}
-          className="absolute top-4 right-4"
-        >
-          {theme === 'light' ? (
-            <Moon className="h-5 w-5 text-muted-foreground" />
-          ) : (
-            <Sun className="h-5 w-5 text-muted-foreground" />
-          )}
-        </Button>
-
-        <div className="w-full max-w-md">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
+      <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center relative z-10">
+        {/* Left Side - Branding & Info */}
+        <div className="hidden lg:flex flex-col justify-center space-y-8 text-white">
+          <div className="space-y-6">
             <img
               src="/assets/logoGIO.png"
-              alt="Logo GIO"
-              className="h-12 w-12 object-contain"
+              alt="GIO Logo"
+              className="h-16 w-auto object-contain"
             />
             <div>
-              <h1 className="text-xl font-bold tracking-wide text-foreground">ASSISTÊNCIA</h1>
-              <p className="text-[10px] tracking-[0.2em] text-muted-foreground">TÉCNICA</p>
+              <h1 className="text-5xl font-bold leading-tight mb-4">
+                Sistema de<br />
+                <span className="text-[#12b0a0]">Assistência</span><br />
+                Técnica
+              </h1>
+              <p className="text-xl text-white/80 leading-relaxed">
+                Gerencie chamados de assistência técnica com eficiência.
+                Acompanhe SLAs, atribua técnicos e mantenha seus clientes satisfeitos.
+              </p>
             </div>
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground">Bem-vindo de volta</h2>
-            <p className="text-muted-foreground mt-1">
-              Entre com suas credenciais para acessar o sistema
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                className="bg-card"
-                {...register('email')}
-              />
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
-              )}
+          {/* Features */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+              <div className="p-3 bg-[#12b0a0] rounded-xl">
+                <Headset className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Controle de Chamados</h3>
+                <p className="text-white/70 text-sm">Gerencie chamados do início ao fim</p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="senha" className="text-sm font-medium">
-                Senha
-              </Label>
-              <div className="relative">
-                <Input
-                  id="senha"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="********"
-                  className="bg-card pr-12"
-                  {...register('senha')}
+            <div className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+              <div className="p-3 bg-[#1e6076] rounded-xl">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Monitoramento de SLA</h3>
+                <p className="text-white/70 text-sm">Acompanhe prazos e performance em tempo real</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
+              <div className="p-3 bg-[#baa673] rounded-xl">
+                <Users className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Gestão de Técnicos</h3>
+                <p className="text-white/70 text-sm">Atribua e acompanhe sua equipe técnica</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side - Login Form */}
+        <div className="flex items-center justify-center">
+          <Card className="w-full max-w-md shadow-2xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-0">
+            <CardHeader className="space-y-4 text-center pb-8">
+              <div className="p-3 bg-gradient-to-br from-[#12b0a0] to-[#1e6076] rounded-2xl w-16 h-16 mx-auto flex items-center justify-center">
+                <img
+                  src="/assets/logoGIO.png"
+                  alt="GIO Logo"
+                  className="h-10 w-auto object-contain"
                 />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  Bem-vindo(a)!
+                </CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400 mt-2">
+                  Faça login para acessar o sistema de assistência técnica
+                </CardDescription>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="seu@email.com"
+                      {...register('email')}
+                      className={`mt-1 h-12 ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-[#12b0a0]'}`}
+                    />
+                    {errors.email && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                        {errors.email.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="senha" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Senha
+                    </Label>
+                    <div className="relative mt-1">
+                      <Input
+                        id="senha"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        {...register('senha')}
+                        className={`h-12 pr-12 ${errors.senha ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-[#12b0a0]'}`}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-12 px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                    </div>
+                    {errors.senha && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                        {errors.senha.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                  onClick={() => setShowPassword(!showPassword)}
+                  type="submit"
+                  className="w-full h-12 bg-gradient-to-r from-[#12b0a0] to-[#1e6076] hover:from-[#0f9d8a] hover:to-[#1a5a6b] text-white font-semibold text-base shadow-lg transition-all duration-200"
+                  disabled={isLoading}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Entrando...
+                    </>
                   ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    'Entrar no Sistema'
                   )}
                 </Button>
-              </div>
-              {errors.senha && (
-                <p className="text-sm text-destructive">{errors.senha.message}</p>
-              )}
-            </div>
+              </form>
 
-            <Button type="submit" className="w-full h-11" disabled={isLoading}>
-              {isLoading ? 'Entrando...' : 'Entrar'}
-            </Button>
-          </form>
+              {/* Test Users */}
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+                  Usuarios de teste:
+                </p>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Admin:</span>
+                    <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">admin@empresa.com / admin123</code>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Coordenador:</span>
+                    <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">coord@empresa.com / coord123</code>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Tecnico:</span>
+                    <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">joao@empresa.com / tecnico123</code>
+                  </div>
+                </div>
+              </div>
 
-          {/* Test Users */}
-          <div className="mt-8 p-4 rounded-lg bg-muted/50 border">
-            <p className="text-xs font-medium text-muted-foreground mb-3">
-              Usuarios de teste:
-            </p>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Admin:</span>
-                <code className="bg-card px-2 py-0.5 rounded text-foreground">admin@empresa.com / admin123</code>
+              {/* Footer */}
+              <div className="text-center pt-4 border-t border-gray-100 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Sistema protegido por autenticação segura
+                </p>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Coordenador:</span>
-                <code className="bg-card px-2 py-0.5 rounded text-foreground">coord@empresa.com / coord123</code>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Tecnico:</span>
-                <code className="bg-card px-2 py-0.5 rounded text-foreground">joao@empresa.com / tecnico123</code>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

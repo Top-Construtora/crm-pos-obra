@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   JoinColumn,
 } from 'typeorm';
 import { ChamadoStatus, Prioridade, TipoImovel, Categoria } from '../types/index.js';
@@ -13,6 +14,9 @@ import { User } from './User.js';
 import { Empreendimento } from './Empreendimento.js';
 import { Historico } from './Historico.js';
 import { Comentario } from './Comentario.js';
+import { Vistoria } from './Vistoria.js';
+import { Material } from './Material.js';
+import { Anexo } from './Anexo.js';
 
 @Entity('chamados')
 export class Chamado {
@@ -82,9 +86,24 @@ export class Chamado {
   @Column({ name: 'finalizado_em', type: 'datetime', nullable: true })
   finalizadoEm?: Date;
 
+  @Column({ name: 'horas_estimadas', type: 'int', nullable: true })
+  horasEstimadas?: number;
+
+  @Column({ name: 'equipe_necessaria', type: 'varchar', length: 100, nullable: true })
+  equipeNecessaria?: string;
+
   @OneToMany(() => Historico, (historico) => historico.chamado)
   historico!: Historico[];
 
   @OneToMany(() => Comentario, (comentario) => comentario.chamado)
   comentarios!: Comentario[];
+
+  @OneToOne(() => Vistoria, (vistoria) => vistoria.chamado)
+  vistoria?: Vistoria;
+
+  @OneToMany(() => Material, (material) => material.chamado)
+  materiais!: Material[];
+
+  @OneToMany(() => Anexo, (anexo) => anexo.chamado)
+  anexos!: Anexo[];
 }

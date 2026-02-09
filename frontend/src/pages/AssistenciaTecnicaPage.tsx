@@ -9,6 +9,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
   DragStartEvent,
   DragEndEvent,
 } from '@dnd-kit/core'
@@ -39,10 +40,13 @@ import {
   ArrowUp,
   MapPin,
   GripVertical,
+  FileText,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { chamadosService } from '@/services/chamados.service'
 import { empreendimentosService } from '@/services/empreendimentos.service'
 import { dashboardService } from '@/services/dashboard.service'
+import { exportChamadosListPDF, exportChamadosExcel } from '@/lib/export'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -54,6 +58,12 @@ import {
   PRIORIDADE_LABELS,
   TIPO_LABELS,
 } from '@/types'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { usePermissions } from '@/hooks/usePermissions'
 import { ChamadoModal } from '@/components/chamados/ChamadoModal'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns'
@@ -165,8 +175,8 @@ function KanbanCard({ chamado, isDragging, onClick }: KanbanCardProps) {
       style={style}
       onClick={onClick}
       className={cn(
-        'relative bg-card rounded-lg border shadow-sm transition-all hover:shadow-md hover:border-primary/50',
-        isDragging && 'opacity-50 rotate-2',
+        'relative bg-card rounded-lg border shadow-sm transition-all duration-200 hover:shadow-md hover:border-primary/50',
+        isDragging && 'opacity-40 scale-[1.02] rotate-1 shadow-xl ring-2 ring-primary/30',
         onClick && 'cursor-pointer'
       )}
     >
@@ -268,12 +278,23 @@ interface KanbanColumnProps {
 }
 
 function KanbanColumn({ column, chamados, onAddClick, onCardClick }: KanbanColumnProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: column.id })
+
   return (
-    <div className="flex flex-col min-w-[340px] max-w-[340px] bg-slate-50 dark:bg-slate-900/50 rounded-xl border max-h-full">
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex flex-col min-w-[340px] max-w-[340px] bg-slate-50 dark:bg-slate-900/50 rounded-xl border max-h-full transition-all duration-200',
+        isOver && 'border-primary/50 bg-primary/5 dark:bg-primary/10 ring-1 ring-primary/20'
+      )}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 bg-card border-b rounded-t-xl">
+      <div className={cn(
+        'flex items-center justify-between px-5 py-4 bg-card border-b rounded-t-xl transition-colors duration-200',
+        isOver && 'bg-primary/10'
+      )}>
         <div className="flex items-center gap-2.5">
-          <span className={cn('w-2.5 h-2.5 rounded-full', column.dotClass)} />
+          <span className={cn('w-2.5 h-2.5 rounded-full transition-transform duration-200', column.dotClass, isOver && 'scale-150')} />
           <span className="font-bold text-sm">{column.title}</span>
           <span className="bg-muted px-2.5 py-0.5 rounded-md text-xs font-bold text-muted-foreground">
             {chamados.length}
@@ -287,7 +308,10 @@ function KanbanColumn({ column, chamados, onAddClick, onCardClick }: KanbanColum
           items={chamados.map((c) => c.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-3 min-h-[200px]">
+          <div className={cn(
+            'space-y-3 min-h-[200px] transition-all duration-200 rounded-lg',
+            isOver && 'bg-primary/5 p-2 -m-2'
+          )}>
             {chamados.map((chamado) => (
               <KanbanCard key={chamado.id} chamado={chamado} onClick={() => onCardClick(chamado.id)} />
             ))}
@@ -700,10 +724,24 @@ export default function AssistenciaTecnicaPage() {
           </button>
         </div>
 
-        <Button variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" />
-          Exportar
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => exportChamadosListPDF(allChamados)}>
+              <FileText className="h-4 w-4 mr-2 text-red-500" />
+              Exportar PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportChamadosExcel(allChamados)}>
+              <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-500" />
+              Exportar Excel
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {canCreateChamado() && (
           <Button className="btn-gradient" onClick={() => handleOpenModal()}>
@@ -735,9 +773,12 @@ export default function AssistenciaTecnicaPage() {
                 ))}
               </div>
 
-              <DragOverlay>
+              <DragOverlay dropAnimation={{
+                duration: 200,
+                easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+              }}>
                 {activeChamado ? (
-                  <div className="w-[320px]">
+                  <div className="w-[320px] scale-105 rotate-2 shadow-2xl opacity-95">
                     <KanbanCard chamado={activeChamado} isDragging />
                   </div>
                 ) : null}

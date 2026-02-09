@@ -35,6 +35,9 @@ export class User {
   @Column({ type: 'boolean', default: true })
   ativo!: boolean;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  avatar?: string;
+
   @CreateDateColumn({ name: 'criado_em' })
   criadoEm!: Date;
 

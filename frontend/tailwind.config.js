@@ -60,13 +60,12 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {
-        'soft': '0px 4px 20px rgba(0, 0, 0, 0.08)',
-        'card': '0px 2px 8px rgba(0, 0, 0, 0.06)',
-        'glow': '0px 4px 20px rgba(18, 176, 160, 0.15)',
+        'soft': '0px 2px 8px rgba(0, 0, 0, 0.04)',
+        'card': '0px 1px 3px rgba(0, 0, 0, 0.05)',
       },
       fontFamily: {
         sans: ['Roboto', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        display: ['Orbitron', 'Inter', 'sans-serif'],
+        display: ['Lemon Milk', 'Inter', 'sans-serif'],
       },
     },
   },
