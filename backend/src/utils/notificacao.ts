@@ -1,11 +1,7 @@
-import { AppDataSource } from '../database/data-source.js';
-import { Notificacao } from '../entities/Notificacao.js';
-import { User } from '../entities/User.js';
+import { supabase } from '../config/supabase.js';
 import { getIO } from '../socket.js';
+import { toCamel } from './db.js';
 import { sendNewChamadoEmail, sendStatusChangeEmail, sendSlaAlertEmail } from '../services/email.service.js';
-
-const getRepo = () => AppDataSource.getRepository(Notificacao);
-const getUserRepo = () => AppDataSource.getRepository(User);
 
 export async function criarNotificacao(params: {
   usuarioId: string;
@@ -20,22 +16,38 @@ export async function criarNotificacao(params: {
     statusNovo?: string;
     horasRestantes?: number;
   };
-}): Promise<Notificacao> {
-  const repo = getRepo();
+}): Promise<any> {
   const { emailData, ...notifParams } = params;
-  const notificacao = repo.create(notifParams);
-  const saved = await repo.save(notificacao);
+
+  const { data: saved, error } = await supabase
+    .from('notificacoes')
+    .insert({
+      usuario_id: notifParams.usuarioId,
+      tipo: notifParams.tipo,
+      titulo: notifParams.titulo,
+      mensagem: notifParams.mensagem,
+      chamado_id: notifParams.chamadoId || null,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao criar notificacao:', error);
+    throw error;
+  }
+
+  const notificacao = toCamel(saved);
 
   // Emit via socket to the target user
   const io = getIO();
   if (io) {
-    io.to(`user:${params.usuarioId}`).emit('notificacao:new', saved);
+    io.to(`user:${params.usuarioId}`).emit('notificacao:new', notificacao);
   }
 
   // Send email notification (async, non-blocking)
   sendEmailForNotification(params.usuarioId, params.tipo, emailData).catch(() => {});
 
-  return saved;
+  return notificacao;
 }
 
 async function sendEmailForNotification(
@@ -51,7 +63,12 @@ async function sendEmailForNotification(
 ): Promise<void> {
   if (!emailData) return;
 
-  const user = await getUserRepo().findOne({ where: { id: usuarioId } });
+  const { data: user } = await supabase
+    .from('users')
+    .select('email')
+    .eq('id', usuarioId)
+    .single();
+
   if (!user?.email) return;
 
   const { chamadoNumero, descricao, statusAnterior, statusNovo, horasRestantes } = emailData;
@@ -68,19 +85,36 @@ async function sendEmailForNotification(
 export async function criarNotificacoes(
   usuarioIds: string[],
   params: { tipo: string; titulo: string; mensagem: string; chamadoId?: string }
-): Promise<Notificacao[]> {
-  const repo = getRepo();
+): Promise<any[]> {
   const uniqueIds = [...new Set(usuarioIds)];
-  const notificacoes = uniqueIds.map((usuarioId) => repo.create({ ...params, usuarioId }));
-  const saved = await repo.save(notificacoes);
+
+  const rows = uniqueIds.map((usuarioId) => ({
+    usuario_id: usuarioId,
+    tipo: params.tipo,
+    titulo: params.titulo,
+    mensagem: params.mensagem,
+    chamado_id: params.chamadoId || null,
+  }));
+
+  const { data: saved, error } = await supabase
+    .from('notificacoes')
+    .insert(rows)
+    .select();
+
+  if (error) {
+    console.error('Erro ao criar notificacoes:', error);
+    throw error;
+  }
+
+  const notificacoes = (saved || []).map(toCamel);
 
   // Emit via socket to each target user
   const io = getIO();
   if (io) {
-    saved.forEach((notificacao) => {
+    notificacoes.forEach((notificacao: any) => {
       io.to(`user:${notificacao.usuarioId}`).emit('notificacao:new', notificacao);
     });
   }
 
-  return saved;
+  return notificacoes;
 }

@@ -11,6 +11,9 @@
     "seed": "pnpm --filter backend seed",
     "lint": "pnpm -r lint"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }

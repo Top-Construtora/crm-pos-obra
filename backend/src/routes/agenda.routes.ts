@@ -1,60 +1,56 @@
 import { Router, Response } from 'express';
-import { AppDataSource } from '../database/data-source.js';
-import { AgendaTecnica } from '../entities/AgendaTecnica.js';
-import { Chamado } from '../entities/Chamado.js';
+import { supabase } from '../config/supabase.js';
 import { authMiddleware, requireRoles } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../types/index.js';
+import { toCamel, sanitizeUser } from '../utils/db.js';
 
 const router = Router();
-const agendaRepository = AppDataSource.getRepository(AgendaTecnica);
-const chamadoRepository = AppDataSource.getRepository(Chamado);
 
-// Aplicar auth em todas as rotas
 router.use(authMiddleware);
 
-// GET /api/agenda - Lista agendamentos
+function processAgenda(raw: any) {
+  const agenda = toCamel(raw);
+  if (agenda.tecnico) agenda.tecnico = sanitizeUser(agenda.tecnico);
+  if (agenda.chamado?.empreendimento) {
+    agenda.chamado.empreendimento = toCamel(agenda.chamado.empreendimento);
+  }
+  return agenda;
+}
+
+// GET /api/agenda
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const { tecnicoId, dataInicio, dataFim, status } = req.query;
 
-    const queryBuilder = agendaRepository
-      .createQueryBuilder('agenda')
-      .leftJoinAndSelect('agenda.chamado', 'chamado')
-      .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-      .leftJoinAndSelect('agenda.tecnico', 'tecnico')
-      .orderBy('agenda.data_agendamento', 'ASC')
-      .addOrderBy('agenda.hora_inicio', 'ASC')
-      .addOrderBy('agenda.ordem_roteiro', 'ASC');
+    let query = supabase
+      .from('agenda_tecnica')
+      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .order('data_agendamento', { ascending: true })
+      .order('hora_inicio', { ascending: true })
+      .order('ordem_roteiro', { ascending: true });
 
-    // Se for técnico, mostrar apenas seus agendamentos
     if (user.role === 'TECNICO') {
-      queryBuilder.where('agenda.tecnico_id = :userId', { userId: user.id });
+      query = query.eq('tecnico_id', user.id);
     } else if (tecnicoId) {
-      queryBuilder.where('agenda.tecnico_id = :tecnicoId', { tecnicoId });
+      query = query.eq('tecnico_id', tecnicoId as string);
     }
 
-    if (dataInicio) {
-      queryBuilder.andWhere('agenda.data_agendamento >= :dataInicio', { dataInicio });
-    }
-    if (dataFim) {
-      queryBuilder.andWhere('agenda.data_agendamento <= :dataFim', { dataFim });
-    }
-    if (status) {
-      queryBuilder.andWhere('agenda.status = :status', { status });
-    }
+    if (dataInicio) query = query.gte('data_agendamento', dataInicio as string);
+    if (dataFim) query = query.lte('data_agendamento', dataFim as string);
+    if (status) query = query.eq('status', status as string);
 
-    const agendamentos = await queryBuilder.getMany();
+    const { data: agendamentos, error } = await query;
+    if (error) throw error;
 
-    res.json(agendamentos);
+    res.json((agendamentos || []).map(processAgenda));
   } catch (error) {
     console.error('List agenda error:', error);
     res.status(500).json({ error: 'Erro ao listar agendamentos' });
   }
 });
 
-// GET /api/agenda/calendario/:mes/:ano
-// Retorna agendamentos de um mês específico agrupados por data
+// GET /api/agenda/calendario/:ano/:mes
 router.get('/calendario/:ano/:mes', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
@@ -65,34 +61,33 @@ router.get('/calendario/:ano/:mes', async (req: AuthRequest, res: Response) => {
     const anoNum = parseInt(ano);
 
     if (isNaN(mesNum) || isNaN(anoNum) || mesNum < 1 || mesNum > 12) {
-      return res.status(400).json({ error: 'Mês ou ano inválido' });
+      return res.status(400).json({ error: 'Mes ou ano invalido' });
     }
 
     const dataInicio = `${anoNum}-${mesNum.toString().padStart(2, '0')}-01`;
     const ultimoDia = new Date(anoNum, mesNum, 0).getDate();
     const dataFim = `${anoNum}-${mesNum.toString().padStart(2, '0')}-${ultimoDia}`;
 
-    const queryBuilder = agendaRepository
-      .createQueryBuilder('agenda')
-      .leftJoinAndSelect('agenda.chamado', 'chamado')
-      .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-      .leftJoinAndSelect('agenda.tecnico', 'tecnico')
-      .where('agenda.data_agendamento >= :dataInicio', { dataInicio })
-      .andWhere('agenda.data_agendamento <= :dataFim', { dataFim })
-      .orderBy('agenda.data_agendamento', 'ASC')
-      .addOrderBy('agenda.hora_inicio', 'ASC');
+    let query = supabase
+      .from('agenda_tecnica')
+      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .gte('data_agendamento', dataInicio)
+      .lte('data_agendamento', dataFim)
+      .order('data_agendamento', { ascending: true })
+      .order('hora_inicio', { ascending: true });
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('agenda.tecnico_id = :userId', { userId: user.id });
+      query = query.eq('tecnico_id', user.id);
     } else if (tecnicoId) {
-      queryBuilder.andWhere('agenda.tecnico_id = :tecnicoId', { tecnicoId });
+      query = query.eq('tecnico_id', tecnicoId as string);
     }
 
-    const agendamentos = await queryBuilder.getMany();
+    const { data: agendamentos, error } = await query;
+    if (error) throw error;
 
-    // Agrupar por data
     const calendario: Record<string, any[]> = {};
-    agendamentos.forEach((ag) => {
+    (agendamentos || []).forEach((raw) => {
+      const ag = processAgenda(raw);
       if (!calendario[ag.dataAgendamento]) {
         calendario[ag.dataAgendamento] = [];
       }
@@ -102,25 +97,27 @@ router.get('/calendario/:ano/:mes', async (req: AuthRequest, res: Response) => {
     res.json(calendario);
   } catch (error) {
     console.error('Get calendario error:', error);
-    res.status(500).json({ error: 'Erro ao buscar calendário' });
+    res.status(500).json({ error: 'Erro ao buscar calendario' });
   }
 });
 
 // GET /api/agenda/:id
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const agenda = await agendaRepository.findOne({
-      where: { id: req.params.id },
-      relations: ['chamado', 'chamado.empreendimento', 'tecnico'],
-    });
+    const { data: raw, error } = await supabase
+      .from('agenda_tecnica')
+      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .eq('id', req.params.id)
+      .single();
 
-    if (!agenda) {
-      return res.status(404).json({ error: 'Agendamento não encontrado' });
+    if (error || !raw) {
+      return res.status(404).json({ error: 'Agendamento nao encontrado' });
     }
 
+    const agenda = processAgenda(raw);
     const user = req.user!;
     if (user.role === 'TECNICO' && agenda.tecnicoId !== user.id) {
-      return res.status(403).json({ error: 'Acesso não autorizado' });
+      return res.status(403).json({ error: 'Acesso nao autorizado' });
     }
 
     res.json(agenda);
@@ -136,34 +133,37 @@ router.post('/', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, 
     const { chamadoId, tecnicoId, dataAgendamento, horaInicio, horaFim, observacoes, latitude, longitude } = req.body;
 
     if (!chamadoId || !tecnicoId || !dataAgendamento || !horaInicio) {
-      return res.status(400).json({ error: 'Campos obrigatórios: chamadoId, tecnicoId, dataAgendamento, horaInicio' });
+      return res.status(400).json({ error: 'Campos obrigatorios: chamadoId, tecnicoId, dataAgendamento, horaInicio' });
     }
 
-    const chamado = await chamadoRepository.findOne({ where: { id: chamadoId } });
+    const { data: chamado } = await supabase
+      .from('chamados')
+      .select('id')
+      .eq('id', chamadoId)
+      .single();
+
     if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
-    const agenda = agendaRepository.create({
-      chamadoId,
-      tecnicoId,
-      dataAgendamento,
-      horaInicio,
-      horaFim,
-      observacoes,
-      latitude,
-      longitude,
-      status: 'AGENDADO',
-    });
+    const { data: agenda, error } = await supabase
+      .from('agenda_tecnica')
+      .insert({
+        chamado_id: chamadoId,
+        tecnico_id: tecnicoId,
+        data_agendamento: dataAgendamento,
+        hora_inicio: horaInicio,
+        hora_fim: horaFim || null,
+        observacoes: observacoes || null,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        status: 'AGENDADO',
+      })
+      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .single();
 
-    await agendaRepository.save(agenda);
-
-    const agendaCompleta = await agendaRepository.findOne({
-      where: { id: agenda.id },
-      relations: ['chamado', 'chamado.empreendimento', 'tecnico'],
-    });
-
-    res.status(201).json(agendaCompleta);
+    if (error) throw error;
+    res.status(201).json(processAgenda(agenda));
   } catch (error) {
     console.error('Create agenda error:', error);
     res.status(500).json({ error: 'Erro ao criar agendamento' });
@@ -174,50 +174,56 @@ router.post('/', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    const agenda = await agendaRepository.findOne({ where: { id: req.params.id } });
 
-    if (!agenda) {
-      return res.status(404).json({ error: 'Agendamento não encontrado' });
+    const { data: agendaRaw } = await supabase
+      .from('agenda_tecnica')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (!agendaRaw) {
+      return res.status(404).json({ error: 'Agendamento nao encontrado' });
     }
 
+    const agenda = toCamel(agendaRaw);
+
     if (user.role === 'TECNICO' && agenda.tecnicoId !== user.id) {
-      return res.status(403).json({ error: 'Acesso não autorizado' });
+      return res.status(403).json({ error: 'Acesso nao autorizado' });
     }
 
     const { tecnicoId, dataAgendamento, horaInicio, horaFim, status, observacoes, ordemRoteiro, latitude, longitude } = req.body;
+    const updates: any = {};
 
     if (user.role !== 'TECNICO') {
-      // Admin e coordenador podem alterar tudo
-      if (tecnicoId !== undefined) agenda.tecnicoId = tecnicoId;
-      if (dataAgendamento !== undefined) agenda.dataAgendamento = dataAgendamento;
-      if (horaInicio !== undefined) agenda.horaInicio = horaInicio;
-      if (horaFim !== undefined) agenda.horaFim = horaFim;
-      if (ordemRoteiro !== undefined) agenda.ordemRoteiro = ordemRoteiro;
+      if (tecnicoId !== undefined) updates.tecnico_id = tecnicoId;
+      if (dataAgendamento !== undefined) updates.data_agendamento = dataAgendamento;
+      if (horaInicio !== undefined) updates.hora_inicio = horaInicio;
+      if (horaFim !== undefined) updates.hora_fim = horaFim;
+      if (ordemRoteiro !== undefined) updates.ordem_roteiro = ordemRoteiro;
     }
 
-    // Todos podem alterar status e observações
     if (status !== undefined) {
-      agenda.status = status;
-      // Registrar início e fim de atendimento
+      updates.status = status;
       if (status === 'NO_LOCAL' && !agenda.inicioAtendimento) {
-        agenda.inicioAtendimento = new Date();
+        updates.inicio_atendimento = new Date().toISOString();
       }
       if (status === 'CONCLUIDO' && !agenda.fimAtendimento) {
-        agenda.fimAtendimento = new Date();
+        updates.fim_atendimento = new Date().toISOString();
       }
     }
-    if (observacoes !== undefined) agenda.observacoes = observacoes;
-    if (latitude !== undefined) agenda.latitude = latitude;
-    if (longitude !== undefined) agenda.longitude = longitude;
+    if (observacoes !== undefined) updates.observacoes = observacoes;
+    if (latitude !== undefined) updates.latitude = latitude;
+    if (longitude !== undefined) updates.longitude = longitude;
 
-    await agendaRepository.save(agenda);
+    const { data: updated, error } = await supabase
+      .from('agenda_tecnica')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .single();
 
-    const agendaAtualizada = await agendaRepository.findOne({
-      where: { id: agenda.id },
-      relations: ['chamado', 'chamado.empreendimento', 'tecnico'],
-    });
-
-    res.json(agendaAtualizada);
+    if (error) throw error;
+    res.json(processAgenda(updated));
   } catch (error) {
     console.error('Update agenda error:', error);
     res.status(500).json({ error: 'Erro ao atualizar agendamento' });
@@ -227,14 +233,17 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 // DELETE /api/agenda/:id
 router.delete('/:id', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, res: Response) => {
   try {
-    const agenda = await agendaRepository.findOne({ where: { id: req.params.id } });
+    const { data: agenda } = await supabase
+      .from('agenda_tecnica')
+      .select('id')
+      .eq('id', req.params.id)
+      .single();
 
     if (!agenda) {
-      return res.status(404).json({ error: 'Agendamento não encontrado' });
+      return res.status(404).json({ error: 'Agendamento nao encontrado' });
     }
 
-    await agendaRepository.remove(agenda);
-
+    await supabase.from('agenda_tecnica').delete().eq('id', req.params.id);
     res.json({ message: 'Agendamento removido com sucesso' });
   } catch (error) {
     console.error('Delete agenda error:', error);
@@ -243,41 +252,35 @@ router.delete('/:id', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequ
 });
 
 // POST /api/agenda/roteirizar
-// Otimiza a ordem dos agendamentos de um técnico em uma data específica
 router.post('/roteirizar', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, res: Response) => {
   try {
     const { tecnicoId, data } = req.body;
 
     if (!tecnicoId || !data) {
-      return res.status(400).json({ error: 'Campos obrigatórios: tecnicoId, data' });
+      return res.status(400).json({ error: 'Campos obrigatorios: tecnicoId, data' });
     }
 
-    const agendamentos = await agendaRepository.find({
-      where: {
-        tecnicoId,
-        dataAgendamento: data,
-      },
-      relations: ['chamado', 'chamado.empreendimento'],
-      order: {
-        horaInicio: 'ASC',
-      },
-    });
+    const { data: agendamentos, error } = await supabase
+      .from('agenda_tecnica')
+      .select('id')
+      .eq('tecnico_id', tecnicoId)
+      .eq('data_agendamento', data)
+      .order('hora_inicio', { ascending: true });
 
-    if (agendamentos.length === 0) {
+    if (error) throw error;
+
+    if (!agendamentos || agendamentos.length === 0) {
       return res.json({ message: 'Nenhum agendamento encontrado para roteirizar' });
     }
 
-    // Ordenar por proximidade (simplificado - em produção usar API de rotas)
-    // Aqui vamos apenas numerar sequencialmente
     for (let i = 0; i < agendamentos.length; i++) {
-      agendamentos[i].ordemRoteiro = i + 1;
-      await agendaRepository.save(agendamentos[i]);
+      await supabase
+        .from('agenda_tecnica')
+        .update({ ordem_roteiro: i + 1 })
+        .eq('id', agendamentos[i].id);
     }
 
-    res.json({
-      message: 'Roteiro otimizado com sucesso',
-      total: agendamentos.length,
-    });
+    res.json({ message: 'Roteiro otimizado com sucesso', total: agendamentos.length });
   } catch (error) {
     console.error('Roteirizar error:', error);
     res.status(500).json({ error: 'Erro ao roteirizar agendamentos' });

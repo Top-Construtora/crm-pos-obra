@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { calcularSLA, formatarTempoRestante } from '../utils/sla.js';
-import { Chamado } from '../entities/Chamado.js';
 
-function criarChamadoMock(overrides: Partial<Chamado> = {}): Chamado {
+function criarChamadoMock(overrides: Record<string, any> = {}): any {
   return {
     id: '1',
     numero: 1001,
@@ -21,7 +20,7 @@ function criarChamadoMock(overrides: Partial<Chamado> = {}): Chamado {
     criadoEm: new Date(),
     atualizadoEm: new Date(),
     ...overrides,
-  } as Chamado;
+  };
 }
 
 describe('calcularSLA', () => {

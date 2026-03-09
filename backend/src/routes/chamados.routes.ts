@@ -1,27 +1,94 @@
 import { Router, Response } from 'express';
-import { AppDataSource } from '../database/data-source.js';
-import { Chamado } from '../entities/Chamado.js';
-import { Historico } from '../entities/Historico.js';
-import { Comentario } from '../entities/Comentario.js';
-import { Vistoria } from '../entities/Vistoria.js';
-import { Material } from '../entities/Material.js';
-import { Anexo } from '../entities/Anexo.js';
+import { supabase } from '../config/supabase.js';
 import { authMiddleware, requireRoles } from '../middlewares/auth.middleware.js';
 import { upload, UPLOAD_DIR } from '../middlewares/upload.middleware.js';
 import { AuthRequest, ChamadoStatus } from '../types/index.js';
 import { calcularSLA } from '../utils/sla.js';
 import { criarNotificacao } from '../utils/notificacao.js';
 import { getIO } from '../socket.js';
+import { toCamel, sanitizeUser } from '../utils/db.js';
+import { obrasSupabaseService } from '../services/obrasSupabase.service.js';
 import fs from 'fs';
 import path from 'path';
 
+// Sincroniza empreendimento do GIO para a tabela local (upsert)
+async function syncEmpreendimento(empreendimentoId: string): Promise<void> {
+  // Check if already exists locally
+  const { data: local } = await supabase
+    .from('empreendimentos')
+    .select('id')
+    .eq('id', empreendimentoId)
+    .single();
+
+  if (local) return; // Already synced
+
+  // Fetch from GIO
+  const obra = await obrasSupabaseService.buscarObraPorId(empreendimentoId);
+  if (!obra) return;
+
+  await supabase.from('empreendimentos').upsert({
+    id: obra.id,
+    nome: obra.nome_limpo || obra.nome,
+    endereco: obra.endereco || '',
+    ativo: obra.ativo !== false,
+  });
+}
+
 const router = Router();
-const chamadoRepository = AppDataSource.getRepository(Chamado);
-const historicoRepository = AppDataSource.getRepository(Historico);
-const comentarioRepository = AppDataSource.getRepository(Comentario);
-const vistoriaRepository = AppDataSource.getRepository(Vistoria);
-const materialRepository = AppDataSource.getRepository(Material);
-const anexoRepository = AppDataSource.getRepository(Anexo);
+
+// Helper: buscar chamado com relacoes
+async function getChamadoWithRelations(id: string, relations: string[] = []) {
+  let select = '*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*), criadoPor:users!criado_por_id(*)';
+
+  if (relations.includes('historico')) {
+    select += ', historico:historicos(*, usuario:users(*))';
+  }
+  if (relations.includes('comentarios')) {
+    select += ', comentarios(*, usuario:users(*))';
+  }
+  if (relations.includes('vistoria')) {
+    select += ', vistoria:vistorias(*)';
+  }
+  if (relations.includes('materiais')) {
+    select += ', materiais(*)';
+  }
+  if (relations.includes('anexos')) {
+    select += ', anexos(*, usuario:users(*))';
+  }
+
+  const { data, error } = await supabase
+    .from('chamados')
+    .select(select)
+    .eq('id', id)
+    .single();
+
+  if (error || !data) return null;
+
+  const chamado = toCamel(data);
+  // Sanitize user fields
+  if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
+  if (chamado.criadoPor) chamado.criadoPor = sanitizeUser(chamado.criadoPor);
+  if (chamado.historico) {
+    chamado.historico = chamado.historico.map((h: any) => {
+      if (h.usuario) h.usuario = sanitizeUser(h.usuario);
+      return h;
+    });
+  }
+  if (chamado.comentarios) {
+    chamado.comentarios = chamado.comentarios.map((c: any) => {
+      if (c.usuario) c.usuario = sanitizeUser(c.usuario);
+      return c;
+    });
+  }
+  if (chamado.anexos) {
+    chamado.anexos = chamado.anexos.map((a: any) => {
+      if (a.usuario) a.usuario = sanitizeUser(a.usuario);
+      return a;
+    });
+  }
+
+  return chamado;
+}
 
 // Aplicar auth em todas as rotas
 router.use(authMiddleware);
@@ -32,62 +99,46 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const { status, empreendimentoId, categoria, responsavelId, prioridade, busca, dataInicio, dataFim, slaStatus, page, limit } = req.query;
     const user = req.user!;
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-      .leftJoinAndSelect('chamado.responsavel', 'responsavel')
-      .leftJoinAndSelect('chamado.criadoPor', 'criadoPor')
-      .orderBy('chamado.criadoEm', 'DESC');
+    let query = supabase
+      .from('chamados')
+      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*), criadoPor:users!criado_por_id(*)', { count: 'exact' })
+      .order('criado_em', { ascending: false });
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavelId = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    if (status) {
-      queryBuilder.andWhere('chamado.status = :status', { status });
-    }
-    if (empreendimentoId) {
-      queryBuilder.andWhere('chamado.empreendimentoId = :empreendimentoId', { empreendimentoId });
-    }
-    if (categoria) {
-      queryBuilder.andWhere('chamado.categoria = :categoria', { categoria });
-    }
-    if (responsavelId) {
-      queryBuilder.andWhere('chamado.responsavelId = :responsavelId', { responsavelId });
-    }
-    if (prioridade) {
-      queryBuilder.andWhere('chamado.prioridade = :prioridade', { prioridade });
-    }
+    if (status) query = query.eq('status', status as string);
+    if (empreendimentoId) query = query.eq('empreendimento_id', empreendimentoId as string);
+    if (categoria) query = query.eq('categoria', categoria as string);
+    if (responsavelId) query = query.eq('responsavel_id', responsavelId as string);
+    if (prioridade) query = query.eq('prioridade', prioridade as string);
+    if (dataInicio) query = query.gte('criado_em', `${dataInicio}T00:00:00`);
+    if (dataFim) query = query.lte('criado_em', `${dataFim}T23:59:59`);
+
     if (busca) {
-      queryBuilder.andWhere(
-        '(chamado.cliente_nome LIKE :busca OR chamado.descricao LIKE :busca OR chamado.unidade LIKE :busca OR chamado.cliente_email LIKE :busca OR CAST(chamado.numero AS TEXT) LIKE :busca)',
-        { busca: `%${busca}%` }
+      query = query.or(
+        `cliente_nome.ilike.%${busca}%,descricao.ilike.%${busca}%,unidade.ilike.%${busca}%,cliente_email.ilike.%${busca}%`
       );
     }
-    if (dataInicio) {
-      queryBuilder.andWhere('chamado.criado_em >= :dataInicio', { dataInicio: `${dataInicio}T00:00:00` });
-    }
-    if (dataFim) {
-      queryBuilder.andWhere('chamado.criado_em <= :dataFim', { dataFim: `${dataFim}T23:59:59` });
-    }
-
-    // Get total count before pagination
-    const total = await queryBuilder.getCount();
 
     // Pagination
     const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 0; // 0 = no limit (backward compatible)
+    const limitNum = parseInt(limit as string) || 0;
     if (limitNum > 0) {
-      queryBuilder.skip((pageNum - 1) * limitNum).take(limitNum);
+      const from = (pageNum - 1) * limitNum;
+      query = query.range(from, from + limitNum - 1);
     }
 
-    const chamados = await queryBuilder.getMany();
+    const { data: chamados, error, count } = await query;
+    if (error) throw error;
 
-    // Compute SLA and optionally filter by SLA status
-    let chamadosComSLA = chamados.map((chamado) => ({
-      ...chamado,
-      slaInfo: calcularSLA(chamado),
-    }));
+    let chamadosComSLA = (chamados || []).map((c) => {
+      const chamado = toCamel(c);
+      if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
+      if (chamado.criadoPor) chamado.criadoPor = sanitizeUser(chamado.criadoPor);
+      return { ...chamado, slaInfo: calcularSLA(chamado) };
+    });
 
     if (slaStatus) {
       chamadosComSLA = chamadosComSLA.filter((c) => {
@@ -98,7 +149,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       });
     }
 
-    res.setHeader('X-Total-Count', total.toString());
+    res.setHeader('X-Total-Count', (count || 0).toString());
     res.json(chamadosComSLA);
   } catch (error) {
     console.error('List chamados error:', error);
@@ -112,42 +163,33 @@ router.get('/kanban', async (req: AuthRequest, res: Response) => {
     const user = req.user!;
     const { empreendimentoId, categoria, responsavelId } = req.query;
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-      .leftJoinAndSelect('chamado.responsavel', 'responsavel')
-      .orderBy('chamado.prioridade', 'DESC')
-      .addOrderBy('chamado.criadoEm', 'ASC');
+    let query = supabase
+      .from('chamados')
+      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*)')
+      .order('criado_em', { ascending: true });
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavelId = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
+    if (empreendimentoId) query = query.eq('empreendimento_id', empreendimentoId as string);
+    if (categoria) query = query.eq('categoria', categoria as string);
+    if (responsavelId) query = query.eq('responsavel_id', responsavelId as string);
 
-    if (empreendimentoId) {
-      queryBuilder.andWhere('chamado.empreendimentoId = :empreendimentoId', { empreendimentoId });
-    }
-    if (categoria) {
-      queryBuilder.andWhere('chamado.categoria = :categoria', { categoria });
-    }
-    if (responsavelId) {
-      queryBuilder.andWhere('chamado.responsavelId = :responsavelId', { responsavelId });
-    }
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
-    const chamados = await queryBuilder.getMany();
-
-    const kanban = {
-      ABERTO: [] as any[],
-      EM_ANDAMENTO: [] as any[],
-      AGUARDANDO: [] as any[],
-      FINALIZADO: [] as any[],
+    const kanban: Record<string, any[]> = {
+      ABERTO: [],
+      EM_ANDAMENTO: [],
+      AGUARDANDO: [],
+      FINALIZADO: [],
     };
 
-    chamados.forEach((chamado) => {
-      const chamadoComSLA = {
-        ...chamado,
-        slaInfo: calcularSLA(chamado),
-      };
-      kanban[chamado.status].push(chamadoComSLA);
+    (chamados || []).forEach((c) => {
+      const chamado = toCamel(c);
+      if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
+      const chamadoComSLA = { ...chamado, slaInfo: calcularSLA(chamado) };
+      kanban[chamado.status]?.push(chamadoComSLA);
     });
 
     res.json(kanban);
@@ -160,33 +202,20 @@ router.get('/kanban', async (req: AuthRequest, res: Response) => {
 // GET /api/chamados/:id
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const chamado = await chamadoRepository.findOne({
-      where: { id: req.params.id },
-      relations: [
-        'empreendimento', 'responsavel', 'criadoPor',
-        'historico', 'historico.usuario',
-        'comentarios', 'comentarios.usuario',
-        'vistoria', 'materiais', 'anexos', 'anexos.usuario',
-      ],
-      order: {
-        historico: { criadoEm: 'DESC' },
-        comentarios: { criadoEm: 'DESC' },
-      },
-    });
+    const chamado = await getChamadoWithRelations(req.params.id, [
+      'historico', 'comentarios', 'vistoria', 'materiais', 'anexos',
+    ]);
 
     if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
     const user = req.user!;
     if (user.role === 'TECNICO' && chamado.responsavelId !== user.id) {
-      return res.status(403).json({ error: 'Acesso não autorizado' });
+      return res.status(403).json({ error: 'Acesso nao autorizado' });
     }
 
-    res.json({
-      ...chamado,
-      slaInfo: calcularSLA(chamado),
-    });
+    res.json({ ...chamado, slaInfo: calcularSLA(chamado) });
   } catch (error) {
     console.error('Get chamado error:', error);
     res.status(500).json({ error: 'Erro ao buscar chamado' });
@@ -203,53 +232,75 @@ router.post('/', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, 
     } = req.body;
 
     if (!empreendimentoId || !unidade || !clienteNome || !clienteTelefone || !tipo || !categoria || !descricao || !prioridade || !slaHoras) {
-      return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+      return res.status(400).json({ error: 'Campos obrigatorios nao preenchidos' });
     }
 
-    const ultimoChamado = await chamadoRepository.findOne({ order: { numero: 'DESC' } });
-    const novoNumero = ultimoChamado ? ultimoChamado.numero + 1 : 1001;
+    // Sync empreendimento from GIO to local table
+    await syncEmpreendimento(empreendimentoId);
 
-    const chamado = chamadoRepository.create({
-      numero: novoNumero, empreendimentoId, unidade, clienteNome, clienteTelefone,
-      clienteEmail, tipo, categoria, descricao, prioridade, slaHoras,
-      status: 'ABERTO', responsavelId: responsavelId || null, criadoPorId: user.id,
-    });
+    // Get next numero
+    const { data: ultimo } = await supabase
+      .from('chamados')
+      .select('numero')
+      .order('numero', { ascending: false })
+      .limit(1)
+      .single();
 
-    await chamadoRepository.save(chamado);
+    const novoNumero = ultimo ? ultimo.numero + 1 : 1001;
 
-    await historicoRepository.save({
-      chamadoId: chamado.id, tipo: 'CRIACAO',
-      descricao: `Chamado #${chamado.numero} criado`, usuarioId: user.id,
+    const { data: chamado, error } = await supabase
+      .from('chamados')
+      .insert({
+        numero: novoNumero,
+        empreendimento_id: empreendimentoId,
+        unidade,
+        cliente_nome: clienteNome,
+        cliente_telefone: clienteTelefone,
+        cliente_email: clienteEmail || null,
+        tipo,
+        categoria,
+        descricao,
+        prioridade,
+        sla_horas: slaHoras,
+        status: 'ABERTO',
+        responsavel_id: responsavelId || null,
+        criado_por_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Historico de criacao
+    await supabase.from('historicos').insert({
+      chamado_id: chamado.id,
+      tipo: 'CRIACAO',
+      descricao: `Chamado #${novoNumero} criado`,
+      usuario_id: user.id,
     });
 
     if (responsavelId) {
-      await historicoRepository.save({
-        chamadoId: chamado.id, tipo: 'RESPONSAVEL',
-        descricao: 'Responsável atribuído', usuarioId: user.id,
-        dadosNovos: JSON.stringify({ responsavelId }),
+      await supabase.from('historicos').insert({
+        chamado_id: chamado.id,
+        tipo: 'RESPONSAVEL',
+        descricao: 'Responsavel atribuido',
+        usuario_id: user.id,
+        dados_novos: JSON.stringify({ responsavelId }),
       });
 
       await criarNotificacao({
         usuarioId: responsavelId,
         tipo: 'ATRIBUICAO',
-        titulo: `Novo chamado atribuido #${chamado.numero}`,
-        mensagem: `Voce foi designado como responsavel pelo chamado #${chamado.numero}`,
+        titulo: `Novo chamado atribuido #${novoNumero}`,
+        mensagem: `Voce foi designado como responsavel pelo chamado #${novoNumero}`,
         chamadoId: chamado.id,
-        emailData: { chamadoNumero: chamado.numero, descricao },
+        emailData: { chamadoNumero: novoNumero, descricao },
       });
     }
 
-    const chamadoCompleto = await chamadoRepository.findOne({
-      where: { id: chamado.id },
-      relations: ['empreendimento', 'responsavel', 'criadoPor'],
-    });
+    const chamadoCompleto = await getChamadoWithRelations(chamado.id);
+    const resultado = { ...chamadoCompleto, slaInfo: calcularSLA(chamadoCompleto!) };
 
-    const resultado = {
-      ...chamadoCompleto,
-      slaInfo: calcularSLA(chamadoCompleto!),
-    };
-
-    // Emit socket event
     const io = getIO();
     if (io) io.emit('chamado:created', resultado);
 
@@ -264,32 +315,38 @@ router.post('/', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, 
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    const chamado = await chamadoRepository.findOne({
-      where: { id: req.params.id },
-      relations: ['responsavel'],
-    });
 
-    if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+    const { data: chamadoRaw, error: fetchError } = await supabase
+      .from('chamados')
+      .select('*, responsavel:users!responsavel_id(*)')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError || !chamadoRaw) {
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
+
+    const chamado = toCamel(chamadoRaw);
 
     if (user.role === 'TECNICO') {
       if (chamado.responsavelId !== user.id) {
-        return res.status(403).json({ error: 'Acesso não autorizado' });
+        return res.status(403).json({ error: 'Acesso nao autorizado' });
       }
       const { status } = req.body;
       if (status && status !== chamado.status) {
         const statusAnterior = chamado.status;
-        chamado.status = status;
-        if (status === 'FINALIZADO') chamado.finalizadoEm = new Date();
-        await chamadoRepository.save(chamado);
+        const updates: any = { status };
+        if (status === 'FINALIZADO') updates.finalizado_em = new Date().toISOString();
 
-        await historicoRepository.save({
-          chamadoId: chamado.id, tipo: 'STATUS',
+        await supabase.from('chamados').update(updates).eq('id', chamado.id);
+
+        await supabase.from('historicos').insert({
+          chamado_id: chamado.id,
+          tipo: 'STATUS',
           descricao: `Status alterado de ${statusAnterior} para ${status}`,
-          usuarioId: user.id,
-          dadosAnteriores: JSON.stringify({ status: statusAnterior }),
-          dadosNovos: JSON.stringify({ status }),
+          usuario_id: user.id,
+          dados_anteriores: JSON.stringify({ status: statusAnterior }),
+          dados_novos: JSON.stringify({ status }),
         });
       }
     } else {
@@ -299,56 +356,58 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         horasEstimadas, equipeNecessaria,
       } = req.body;
 
+      const updates: any = {};
       const alteracoes: string[] = [];
 
       if (empreendimentoId && empreendimentoId !== chamado.empreendimentoId) {
-        chamado.empreendimentoId = empreendimentoId; alteracoes.push('empreendimento');
+        updates.empreendimento_id = empreendimentoId; alteracoes.push('empreendimento');
       }
       if (unidade && unidade !== chamado.unidade) {
-        chamado.unidade = unidade; alteracoes.push('unidade');
+        updates.unidade = unidade; alteracoes.push('unidade');
       }
       if (clienteNome && clienteNome !== chamado.clienteNome) {
-        chamado.clienteNome = clienteNome; alteracoes.push('nome do cliente');
+        updates.cliente_nome = clienteNome; alteracoes.push('nome do cliente');
       }
       if (clienteTelefone && clienteTelefone !== chamado.clienteTelefone) {
-        chamado.clienteTelefone = clienteTelefone; alteracoes.push('telefone');
+        updates.cliente_telefone = clienteTelefone; alteracoes.push('telefone');
       }
-      if (clienteEmail !== undefined) chamado.clienteEmail = clienteEmail;
+      if (clienteEmail !== undefined) updates.cliente_email = clienteEmail;
       if (tipo && tipo !== chamado.tipo) {
-        chamado.tipo = tipo; alteracoes.push('tipo');
+        updates.tipo = tipo; alteracoes.push('tipo');
       }
       if (categoria && categoria !== chamado.categoria) {
-        chamado.categoria = categoria; alteracoes.push('categoria');
+        updates.categoria = categoria; alteracoes.push('categoria');
       }
       if (descricao && descricao !== chamado.descricao) {
-        chamado.descricao = descricao; alteracoes.push('descrição');
+        updates.descricao = descricao; alteracoes.push('descricao');
       }
       if (prioridade && prioridade !== chamado.prioridade) {
-        chamado.prioridade = prioridade; alteracoes.push('prioridade');
+        updates.prioridade = prioridade; alteracoes.push('prioridade');
       }
       if (slaHoras && slaHoras !== chamado.slaHoras) {
-        chamado.slaHoras = slaHoras; alteracoes.push('SLA');
+        updates.sla_horas = slaHoras; alteracoes.push('SLA');
       }
-      if (horasEstimadas !== undefined) chamado.horasEstimadas = horasEstimadas;
-      if (equipeNecessaria !== undefined) chamado.equipeNecessaria = equipeNecessaria;
+      if (horasEstimadas !== undefined) updates.horas_estimadas = horasEstimadas;
+      if (equipeNecessaria !== undefined) updates.equipe_necessaria = equipeNecessaria;
 
       if (status && status !== chamado.status) {
         const statusAnterior = chamado.status;
-        chamado.status = status;
-        if (status === 'FINALIZADO') chamado.finalizadoEm = new Date();
+        updates.status = status;
+        if (status === 'FINALIZADO') updates.finalizado_em = new Date().toISOString();
 
-        await historicoRepository.save({
-          chamadoId: chamado.id, tipo: 'STATUS',
+        await supabase.from('historicos').insert({
+          chamado_id: chamado.id,
+          tipo: 'STATUS',
           descricao: `Status alterado de ${statusAnterior} para ${status}`,
-          usuarioId: user.id,
-          dadosAnteriores: JSON.stringify({ status: statusAnterior }),
-          dadosNovos: JSON.stringify({ status }),
+          usuario_id: user.id,
+          dados_anteriores: JSON.stringify({ status: statusAnterior }),
+          dados_novos: JSON.stringify({ status }),
         });
 
-        // Notificar responsavel sobre mudanca de status
         if (chamado.responsavelId && chamado.responsavelId !== user.id) {
           await criarNotificacao({
-            usuarioId: chamado.responsavelId, tipo: 'STATUS_ALTERADO',
+            usuarioId: chamado.responsavelId,
+            tipo: 'STATUS_ALTERADO',
             titulo: `Status alterado #${chamado.numero}`,
             mensagem: `Chamado #${chamado.numero} mudou de ${statusAnterior} para ${status}`,
             chamadoId: chamado.id,
@@ -359,19 +418,21 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
       if (responsavelId !== undefined && responsavelId !== chamado.responsavelId) {
         const responsavelAnterior = chamado.responsavelId;
-        chamado.responsavelId = responsavelId || null;
+        updates.responsavel_id = responsavelId || null;
 
-        await historicoRepository.save({
-          chamadoId: chamado.id, tipo: 'RESPONSAVEL',
-          descricao: responsavelId ? 'Responsável alterado' : 'Responsável removido',
-          usuarioId: user.id,
-          dadosAnteriores: JSON.stringify({ responsavelId: responsavelAnterior }),
-          dadosNovos: JSON.stringify({ responsavelId }),
+        await supabase.from('historicos').insert({
+          chamado_id: chamado.id,
+          tipo: 'RESPONSAVEL',
+          descricao: responsavelId ? 'Responsavel alterado' : 'Responsavel removido',
+          usuario_id: user.id,
+          dados_anteriores: JSON.stringify({ responsavelId: responsavelAnterior }),
+          dados_novos: JSON.stringify({ responsavelId }),
         });
 
         if (responsavelId) {
           await criarNotificacao({
-            usuarioId: responsavelId, tipo: 'ATRIBUICAO',
+            usuarioId: responsavelId,
+            tipo: 'ATRIBUICAO',
             titulo: `Chamado atribuido #${chamado.numero}`,
             mensagem: `Voce foi designado como responsavel pelo chamado #${chamado.numero}`,
             chamadoId: chamado.id,
@@ -381,27 +442,22 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       }
 
       if (alteracoes.length > 0) {
-        await historicoRepository.save({
-          chamadoId: chamado.id, tipo: 'EDICAO',
+        await supabase.from('historicos').insert({
+          chamado_id: chamado.id,
+          tipo: 'EDICAO',
           descricao: `Campos alterados: ${alteracoes.join(', ')}`,
-          usuarioId: user.id,
+          usuario_id: user.id,
         });
       }
 
-      await chamadoRepository.save(chamado);
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('chamados').update(updates).eq('id', chamado.id);
+      }
     }
 
-    const chamadoAtualizado = await chamadoRepository.findOne({
-      where: { id: chamado.id },
-      relations: ['empreendimento', 'responsavel', 'criadoPor'],
-    });
+    const chamadoAtualizado = await getChamadoWithRelations(chamado.id);
+    const resultado = { ...chamadoAtualizado, slaInfo: calcularSLA(chamadoAtualizado!) };
 
-    const resultado = {
-      ...chamadoAtualizado,
-      slaInfo: calcularSLA(chamadoAtualizado!),
-    };
-
-    // Emit socket event
     const io = getIO();
     if (io) io.emit('chamado:updated', resultado);
 
@@ -419,31 +475,38 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
     const { status } = req.body;
 
     if (!status) {
-      return res.status(400).json({ error: 'Status é obrigatório' });
+      return res.status(400).json({ error: 'Status e obrigatorio' });
     }
 
-    const chamado = await chamadoRepository.findOne({ where: { id: req.params.id } });
+    const { data: chamadoRaw } = await supabase
+      .from('chamados')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
 
-    if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+    if (!chamadoRaw) {
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
+
+    const chamado = toCamel(chamadoRaw);
 
     if (user.role === 'TECNICO' && chamado.responsavelId !== user.id) {
-      return res.status(403).json({ error: 'Acesso não autorizado' });
+      return res.status(403).json({ error: 'Acesso nao autorizado' });
     }
 
     const statusAnterior = chamado.status;
-    chamado.status = status as ChamadoStatus;
-    if (status === 'FINALIZADO') chamado.finalizadoEm = new Date();
+    const updates: any = { status };
+    if (status === 'FINALIZADO') updates.finalizado_em = new Date().toISOString();
 
-    await chamadoRepository.save(chamado);
+    await supabase.from('chamados').update(updates).eq('id', chamado.id);
 
-    await historicoRepository.save({
-      chamadoId: chamado.id, tipo: 'STATUS',
+    await supabase.from('historicos').insert({
+      chamado_id: chamado.id,
+      tipo: 'STATUS',
       descricao: `Status alterado de ${statusAnterior} para ${status}`,
-      usuarioId: user.id,
-      dadosAnteriores: JSON.stringify({ status: statusAnterior }),
-      dadosNovos: JSON.stringify({ status }),
+      usuario_id: user.id,
+      dados_anteriores: JSON.stringify({ status: statusAnterior }),
+      dados_novos: JSON.stringify({ status }),
     });
 
     // Notificar criador e responsavel
@@ -452,7 +515,8 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
     if (chamado.responsavelId && chamado.responsavelId !== user.id) notifyIds.push(chamado.responsavelId);
     for (const uid of [...new Set(notifyIds)]) {
       await criarNotificacao({
-        usuarioId: uid, tipo: 'STATUS_ALTERADO',
+        usuarioId: uid,
+        tipo: 'STATUS_ALTERADO',
         titulo: `Status alterado #${chamado.numero}`,
         mensagem: `Chamado #${chamado.numero} mudou de ${statusAnterior} para ${status}`,
         chamadoId: chamado.id,
@@ -460,9 +524,8 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Emit socket event
     const io = getIO();
-    if (io) io.emit('chamado:statusChanged', { id: chamado.id, status: chamado.status, statusAnterior });
+    if (io) io.emit('chamado:statusChanged', { id: chamado.id, status, statusAnterior });
 
     res.json({ message: 'Status atualizado com sucesso' });
   } catch (error) {
@@ -474,27 +537,31 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
 // DELETE /api/chamados/:id
 router.delete('/:id', requireRoles('ADMIN'), async (req, res: Response) => {
   try {
-    const chamado = await chamadoRepository.findOne({ where: { id: req.params.id } });
+    const { data: chamado } = await supabase
+      .from('chamados')
+      .select('id')
+      .eq('id', req.params.id)
+      .single();
 
     if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
     // Limpar anexos do disco
-    const anexos = await anexoRepository.find({ where: { chamadoId: chamado.id } });
-    for (const anexo of anexos) {
-      const filePath = path.join(UPLOAD_DIR, anexo.nomeArquivo);
+    const { data: anexos } = await supabase
+      .from('anexos')
+      .select('nome_arquivo')
+      .eq('chamado_id', chamado.id);
+
+    for (const anexo of anexos || []) {
+      const filePath = path.join(UPLOAD_DIR, anexo.nome_arquivo);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
 
-    await anexoRepository.delete({ chamadoId: chamado.id });
-    await materialRepository.delete({ chamadoId: chamado.id });
-    await vistoriaRepository.delete({ chamadoId: chamado.id });
-    await comentarioRepository.delete({ chamadoId: chamado.id });
-    await historicoRepository.delete({ chamadoId: chamado.id });
-    await chamadoRepository.remove(chamado);
+    // ON DELETE CASCADE cuida das tabelas filhas
+    await supabase.from('chamados').delete().eq('id', chamado.id);
 
-    res.json({ message: 'Chamado excluído com sucesso' });
+    res.json({ message: 'Chamado excluido com sucesso' });
   } catch (error) {
     console.error('Delete chamado error:', error);
     res.status(500).json({ error: 'Erro ao excluir chamado' });
@@ -508,50 +575,65 @@ router.post('/:id/comentarios', async (req: AuthRequest, res: Response) => {
     const { texto } = req.body;
 
     if (!texto) {
-      return res.status(400).json({ error: 'Texto é obrigatório' });
+      return res.status(400).json({ error: 'Texto e obrigatorio' });
     }
 
-    const chamado = await chamadoRepository.findOne({ where: { id: req.params.id } });
+    const { data: chamadoRaw } = await supabase
+      .from('chamados')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
 
-    if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+    if (!chamadoRaw) {
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
+
+    const chamado = toCamel(chamadoRaw);
 
     if (user.role === 'TECNICO' && chamado.responsavelId !== user.id) {
-      return res.status(403).json({ error: 'Acesso não autorizado' });
+      return res.status(403).json({ error: 'Acesso nao autorizado' });
     }
 
-    const comentario = comentarioRepository.create({
-      chamadoId: chamado.id, texto, usuarioId: user.id,
-    });
-    await comentarioRepository.save(comentario);
+    const { data: comentario, error } = await supabase
+      .from('comentarios')
+      .insert({
+        chamado_id: chamado.id,
+        texto,
+        usuario_id: user.id,
+      })
+      .select('*, usuario:users(*)')
+      .single();
 
-    await historicoRepository.save({
-      chamadoId: chamado.id, tipo: 'COMENTARIO',
-      descricao: 'Novo comentário adicionado', usuarioId: user.id,
+    if (error) throw error;
+
+    await supabase.from('historicos').insert({
+      chamado_id: chamado.id,
+      tipo: 'COMENTARIO',
+      descricao: 'Novo comentario adicionado',
+      usuario_id: user.id,
     });
 
-    // Notificar participantes (exceto quem comentou)
+    // Notificar participantes
     const notifyIds: string[] = [];
     if (chamado.criadoPorId && chamado.criadoPorId !== user.id) notifyIds.push(chamado.criadoPorId);
     if (chamado.responsavelId && chamado.responsavelId !== user.id) notifyIds.push(chamado.responsavelId);
     for (const uid of [...new Set(notifyIds)]) {
       await criarNotificacao({
-        usuarioId: uid, tipo: 'COMENTARIO',
+        usuarioId: uid,
+        tipo: 'COMENTARIO',
         titulo: `Novo comentario #${chamado.numero}`,
         mensagem: `${user.nome} comentou no chamado #${chamado.numero}`,
         chamadoId: chamado.id,
       });
     }
 
-    const comentarioCompleto = await comentarioRepository.findOne({
-      where: { id: comentario.id }, relations: ['usuario'],
-    });
+    const result = toCamel(comentario);
+    if (result.usuario) result.usuario = sanitizeUser(result.usuario);
 
-    res.status(201).json(comentarioCompleto);
+    res.status(201).json(result);
   } catch (error) {
     console.error('Create comentario error:', error);
-    res.status(500).json({ error: 'Erro ao criar comentário' });
+    res.status(500).json({ error: 'Erro ao criar comentario' });
   }
 });
 
@@ -559,26 +641,39 @@ router.post('/:id/comentarios', async (req: AuthRequest, res: Response) => {
 router.get('/:id/comentarios', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    const chamado = await chamadoRepository.findOne({ where: { id: req.params.id } });
 
-    if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+    const { data: chamadoRaw } = await supabase
+      .from('chamados')
+      .select('id, responsavel_id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (!chamadoRaw) {
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
-    if (user.role === 'TECNICO' && chamado.responsavelId !== user.id) {
-      return res.status(403).json({ error: 'Acesso não autorizado' });
+    if (user.role === 'TECNICO' && chamadoRaw.responsavel_id !== user.id) {
+      return res.status(403).json({ error: 'Acesso nao autorizado' });
     }
 
-    const comentarios = await comentarioRepository.find({
-      where: { chamadoId: chamado.id },
-      relations: ['usuario'],
-      order: { criadoEm: 'DESC' },
+    const { data: comentarios, error } = await supabase
+      .from('comentarios')
+      .select('*, usuario:users(*)')
+      .eq('chamado_id', req.params.id)
+      .order('criado_em', { ascending: false });
+
+    if (error) throw error;
+
+    const result = (comentarios || []).map((c) => {
+      const com = toCamel(c);
+      if (com.usuario) com.usuario = sanitizeUser(com.usuario);
+      return com;
     });
 
-    res.json(comentarios);
+    res.json(result);
   } catch (error) {
     console.error('List comentarios error:', error);
-    res.status(500).json({ error: 'Erro ao listar comentários' });
+    res.status(500).json({ error: 'Erro ao listar comentarios' });
   }
 });
 
@@ -587,15 +682,17 @@ router.get('/:id/comentarios', async (req: AuthRequest, res: Response) => {
 // GET /api/chamados/:id/vistoria
 router.get('/:id/vistoria', async (req: AuthRequest, res: Response) => {
   try {
-    const vistoria = await vistoriaRepository.findOne({
-      where: { chamadoId: req.params.id },
-    });
+    const { data: vistoria, error } = await supabase
+      .from('vistorias')
+      .select('*')
+      .eq('chamado_id', req.params.id)
+      .single();
 
-    if (!vistoria) {
-      return res.status(404).json({ error: 'Vistoria não encontrada' });
+    if (error || !vistoria) {
+      return res.status(404).json({ error: 'Vistoria nao encontrada' });
     }
 
-    res.json(vistoria);
+    res.json(toCamel(vistoria));
   } catch (error) {
     console.error('Get vistoria error:', error);
     res.status(500).json({ error: 'Erro ao buscar vistoria' });
@@ -605,35 +702,56 @@ router.get('/:id/vistoria', async (req: AuthRequest, res: Response) => {
 // POST /api/chamados/:id/vistoria
 router.post('/:id/vistoria', async (req: AuthRequest, res: Response) => {
   try {
-    const chamado = await chamadoRepository.findOne({ where: { id: req.params.id } });
+    const { data: chamado } = await supabase
+      .from('chamados')
+      .select('id')
+      .eq('id', req.params.id)
+      .single();
+
     if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
-    const existente = await vistoriaRepository.findOne({ where: { chamadoId: chamado.id } });
+    const { data: existente } = await supabase
+      .from('vistorias')
+      .select('id')
+      .eq('chamado_id', chamado.id)
+      .single();
+
     if (existente) {
-      return res.status(400).json({ error: 'Vistoria já existe para este chamado' });
+      return res.status(400).json({ error: 'Vistoria ja existe para este chamado' });
     }
 
     const { dataVistoria, horaInicio, horaTermino, tecnicoPresente, causaIdentificada, parecerTecnico } = req.body;
 
     if (!dataVistoria || !horaInicio || !tecnicoPresente) {
-      return res.status(400).json({ error: 'Campos obrigatórios: dataVistoria, horaInicio, tecnicoPresente' });
+      return res.status(400).json({ error: 'Campos obrigatorios: dataVistoria, horaInicio, tecnicoPresente' });
     }
 
-    const vistoria = vistoriaRepository.create({
-      chamadoId: chamado.id, dataVistoria, horaInicio, horaTermino,
-      tecnicoPresente, causaIdentificada, parecerTecnico,
-    });
-    await vistoriaRepository.save(vistoria);
+    const { data: vistoria, error } = await supabase
+      .from('vistorias')
+      .insert({
+        chamado_id: chamado.id,
+        data_vistoria: dataVistoria,
+        hora_inicio: horaInicio,
+        hora_termino: horaTermino || null,
+        tecnico_presente: tecnicoPresente,
+        causa_identificada: causaIdentificada || null,
+        parecer_tecnico: parecerTecnico || null,
+      })
+      .select()
+      .single();
 
-    await historicoRepository.save({
-      chamadoId: chamado.id, tipo: 'EDICAO',
-      descricao: 'Vistoria técnica registrada',
-      usuarioId: req.user!.id,
+    if (error) throw error;
+
+    await supabase.from('historicos').insert({
+      chamado_id: chamado.id,
+      tipo: 'EDICAO',
+      descricao: 'Vistoria tecnica registrada',
+      usuario_id: req.user!.id,
     });
 
-    res.status(201).json(vistoria);
+    res.status(201).json(toCamel(vistoria));
   } catch (error) {
     console.error('Create vistoria error:', error);
     res.status(500).json({ error: 'Erro ao criar vistoria' });
@@ -643,29 +761,43 @@ router.post('/:id/vistoria', async (req: AuthRequest, res: Response) => {
 // PUT /api/chamados/:id/vistoria
 router.put('/:id/vistoria', async (req: AuthRequest, res: Response) => {
   try {
-    const vistoria = await vistoriaRepository.findOne({ where: { chamadoId: req.params.id } });
-    if (!vistoria) {
-      return res.status(404).json({ error: 'Vistoria não encontrada' });
+    const { data: vistoriaRaw } = await supabase
+      .from('vistorias')
+      .select('*')
+      .eq('chamado_id', req.params.id)
+      .single();
+
+    if (!vistoriaRaw) {
+      return res.status(404).json({ error: 'Vistoria nao encontrada' });
     }
 
     const { dataVistoria, horaInicio, horaTermino, tecnicoPresente, causaIdentificada, parecerTecnico } = req.body;
+    const updates: any = {};
 
-    if (dataVistoria !== undefined) vistoria.dataVistoria = dataVistoria;
-    if (horaInicio !== undefined) vistoria.horaInicio = horaInicio;
-    if (horaTermino !== undefined) vistoria.horaTermino = horaTermino;
-    if (tecnicoPresente !== undefined) vistoria.tecnicoPresente = tecnicoPresente;
-    if (causaIdentificada !== undefined) vistoria.causaIdentificada = causaIdentificada;
-    if (parecerTecnico !== undefined) vistoria.parecerTecnico = parecerTecnico;
+    if (dataVistoria !== undefined) updates.data_vistoria = dataVistoria;
+    if (horaInicio !== undefined) updates.hora_inicio = horaInicio;
+    if (horaTermino !== undefined) updates.hora_termino = horaTermino;
+    if (tecnicoPresente !== undefined) updates.tecnico_presente = tecnicoPresente;
+    if (causaIdentificada !== undefined) updates.causa_identificada = causaIdentificada;
+    if (parecerTecnico !== undefined) updates.parecer_tecnico = parecerTecnico;
 
-    await vistoriaRepository.save(vistoria);
+    const { data: vistoria, error } = await supabase
+      .from('vistorias')
+      .update(updates)
+      .eq('chamado_id', req.params.id)
+      .select()
+      .single();
 
-    await historicoRepository.save({
-      chamadoId: req.params.id, tipo: 'EDICAO',
-      descricao: 'Vistoria técnica atualizada',
-      usuarioId: req.user!.id,
+    if (error) throw error;
+
+    await supabase.from('historicos').insert({
+      chamado_id: req.params.id,
+      tipo: 'EDICAO',
+      descricao: 'Vistoria tecnica atualizada',
+      usuario_id: req.user!.id,
     });
 
-    res.json(vistoria);
+    res.json(toCamel(vistoria));
   } catch (error) {
     console.error('Update vistoria error:', error);
     res.status(500).json({ error: 'Erro ao atualizar vistoria' });
@@ -675,12 +807,17 @@ router.put('/:id/vistoria', async (req: AuthRequest, res: Response) => {
 // DELETE /api/chamados/:id/vistoria
 router.delete('/:id/vistoria', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, res: Response) => {
   try {
-    const vistoria = await vistoriaRepository.findOne({ where: { chamadoId: req.params.id } });
+    const { data: vistoria } = await supabase
+      .from('vistorias')
+      .select('id')
+      .eq('chamado_id', req.params.id)
+      .single();
+
     if (!vistoria) {
-      return res.status(404).json({ error: 'Vistoria não encontrada' });
+      return res.status(404).json({ error: 'Vistoria nao encontrada' });
     }
 
-    await vistoriaRepository.remove(vistoria);
+    await supabase.from('vistorias').delete().eq('chamado_id', req.params.id);
     res.json({ message: 'Vistoria removida com sucesso' });
   } catch (error) {
     console.error('Delete vistoria error:', error);
@@ -693,11 +830,14 @@ router.delete('/:id/vistoria', requireRoles('ADMIN', 'COORDENADOR'), async (req:
 // GET /api/chamados/:id/materiais
 router.get('/:id/materiais', async (req: AuthRequest, res: Response) => {
   try {
-    const materiais = await materialRepository.find({
-      where: { chamadoId: req.params.id },
-      order: { criadoEm: 'ASC' },
-    });
-    res.json(materiais);
+    const { data: materiais, error } = await supabase
+      .from('materiais')
+      .select('*')
+      .eq('chamado_id', req.params.id)
+      .order('criado_em', { ascending: true });
+
+    if (error) throw error;
+    res.json((materiais || []).map(toCamel));
   } catch (error) {
     console.error('List materiais error:', error);
     res.status(500).json({ error: 'Erro ao listar materiais' });
@@ -707,25 +847,34 @@ router.get('/:id/materiais', async (req: AuthRequest, res: Response) => {
 // POST /api/chamados/:id/materiais
 router.post('/:id/materiais', async (req: AuthRequest, res: Response) => {
   try {
-    const chamado = await chamadoRepository.findOne({ where: { id: req.params.id } });
+    const { data: chamado } = await supabase
+      .from('chamados')
+      .select('id')
+      .eq('id', req.params.id)
+      .single();
+
     if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
     const { nome, quantidade, valorUnitario } = req.body;
     if (!nome) {
-      return res.status(400).json({ error: 'Nome do material é obrigatório' });
+      return res.status(400).json({ error: 'Nome do material e obrigatorio' });
     }
 
-    const material = materialRepository.create({
-      chamadoId: chamado.id,
-      nome,
-      quantidade: quantidade || 1,
-      valorUnitario: valorUnitario || 0,
-    });
-    await materialRepository.save(material);
+    const { data: material, error } = await supabase
+      .from('materiais')
+      .insert({
+        chamado_id: chamado.id,
+        nome,
+        quantidade: quantidade || 1,
+        valor_unitario: valorUnitario || 0,
+      })
+      .select()
+      .single();
 
-    res.status(201).json(material);
+    if (error) throw error;
+    res.status(201).json(toCamel(material));
   } catch (error) {
     console.error('Create material error:', error);
     res.status(500).json({ error: 'Erro ao adicionar material' });
@@ -735,21 +884,27 @@ router.post('/:id/materiais', async (req: AuthRequest, res: Response) => {
 // PUT /api/chamados/:id/materiais/:materialId
 router.put('/:id/materiais/:materialId', async (req: AuthRequest, res: Response) => {
   try {
-    const material = await materialRepository.findOne({
-      where: { id: req.params.materialId, chamadoId: req.params.id },
-    });
-    if (!material) {
-      return res.status(404).json({ error: 'Material não encontrado' });
+    const { nome, quantidade, valorUnitario, aprovado } = req.body;
+    const updates: any = {};
+
+    if (nome !== undefined) updates.nome = nome;
+    if (quantidade !== undefined) updates.quantidade = quantidade;
+    if (valorUnitario !== undefined) updates.valor_unitario = valorUnitario;
+    if (aprovado !== undefined) updates.aprovado = aprovado;
+
+    const { data: material, error } = await supabase
+      .from('materiais')
+      .update(updates)
+      .eq('id', req.params.materialId)
+      .eq('chamado_id', req.params.id)
+      .select()
+      .single();
+
+    if (error || !material) {
+      return res.status(404).json({ error: 'Material nao encontrado' });
     }
 
-    const { nome, quantidade, valorUnitario, aprovado } = req.body;
-    if (nome !== undefined) material.nome = nome;
-    if (quantidade !== undefined) material.quantidade = quantidade;
-    if (valorUnitario !== undefined) material.valorUnitario = valorUnitario;
-    if (aprovado !== undefined) material.aprovado = aprovado;
-
-    await materialRepository.save(material);
-    res.json(material);
+    res.json(toCamel(material));
   } catch (error) {
     console.error('Update material error:', error);
     res.status(500).json({ error: 'Erro ao atualizar material' });
@@ -759,33 +914,47 @@ router.put('/:id/materiais/:materialId', async (req: AuthRequest, res: Response)
 // PATCH /api/chamados/:id/materiais/:materialId/aprovado
 router.patch('/:id/materiais/:materialId/aprovado', async (req: AuthRequest, res: Response) => {
   try {
-    const material = await materialRepository.findOne({
-      where: { id: req.params.materialId, chamadoId: req.params.id },
-    });
-    if (!material) {
-      return res.status(404).json({ error: 'Material não encontrado' });
+    const { data: mat } = await supabase
+      .from('materiais')
+      .select('aprovado')
+      .eq('id', req.params.materialId)
+      .eq('chamado_id', req.params.id)
+      .single();
+
+    if (!mat) {
+      return res.status(404).json({ error: 'Material nao encontrado' });
     }
 
-    material.aprovado = !material.aprovado;
-    await materialRepository.save(material);
-    res.json(material);
+    const { data: material, error } = await supabase
+      .from('materiais')
+      .update({ aprovado: !mat.aprovado })
+      .eq('id', req.params.materialId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(toCamel(material));
   } catch (error) {
     console.error('Toggle material aprovado error:', error);
-    res.status(500).json({ error: 'Erro ao alterar aprovação' });
+    res.status(500).json({ error: 'Erro ao alterar aprovacao' });
   }
 });
 
 // DELETE /api/chamados/:id/materiais/:materialId
 router.delete('/:id/materiais/:materialId', async (req: AuthRequest, res: Response) => {
   try {
-    const material = await materialRepository.findOne({
-      where: { id: req.params.materialId, chamadoId: req.params.id },
-    });
+    const { data: material } = await supabase
+      .from('materiais')
+      .select('id')
+      .eq('id', req.params.materialId)
+      .eq('chamado_id', req.params.id)
+      .single();
+
     if (!material) {
-      return res.status(404).json({ error: 'Material não encontrado' });
+      return res.status(404).json({ error: 'Material nao encontrado' });
     }
 
-    await materialRepository.remove(material);
+    await supabase.from('materiais').delete().eq('id', req.params.materialId);
     res.json({ message: 'Material removido com sucesso' });
   } catch (error) {
     console.error('Delete material error:', error);
@@ -798,12 +967,21 @@ router.delete('/:id/materiais/:materialId', async (req: AuthRequest, res: Respon
 // GET /api/chamados/:id/anexos
 router.get('/:id/anexos', async (req: AuthRequest, res: Response) => {
   try {
-    const anexos = await anexoRepository.find({
-      where: { chamadoId: req.params.id },
-      relations: ['usuario'],
-      order: { criadoEm: 'DESC' },
+    const { data: anexos, error } = await supabase
+      .from('anexos')
+      .select('*, usuario:users(*)')
+      .eq('chamado_id', req.params.id)
+      .order('criado_em', { ascending: false });
+
+    if (error) throw error;
+
+    const result = (anexos || []).map((a) => {
+      const anexo = toCamel(a);
+      if (anexo.usuario) anexo.usuario = sanitizeUser(anexo.usuario);
+      return anexo;
     });
-    res.json(anexos);
+
+    res.json(result);
   } catch (error) {
     console.error('List anexos error:', error);
     res.status(500).json({ error: 'Erro ao listar anexos' });
@@ -813,37 +991,47 @@ router.get('/:id/anexos', async (req: AuthRequest, res: Response) => {
 // POST /api/chamados/:id/anexos
 router.post('/:id/anexos', upload.single('arquivo'), async (req: AuthRequest, res: Response) => {
   try {
-    const chamado = await chamadoRepository.findOne({ where: { id: req.params.id } });
+    const { data: chamado } = await supabase
+      .from('chamados')
+      .select('id')
+      .eq('id', req.params.id)
+      .single();
+
     if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
     const file = req.file;
     if (!file) {
-      return res.status(400).json({ error: 'Arquivo é obrigatório' });
+      return res.status(400).json({ error: 'Arquivo e obrigatorio' });
     }
 
-    const anexo = anexoRepository.create({
-      chamadoId: chamado.id,
-      nomeOriginal: file.originalname,
-      nomeArquivo: file.filename,
-      tamanho: file.size,
-      tipo: file.mimetype,
-      usuarioId: req.user!.id,
-    });
-    await anexoRepository.save(anexo);
+    const { data: anexo, error } = await supabase
+      .from('anexos')
+      .insert({
+        chamado_id: chamado.id,
+        nome_original: file.originalname,
+        nome_arquivo: file.filename,
+        tamanho: file.size,
+        tipo: file.mimetype,
+        usuario_id: req.user!.id,
+      })
+      .select('*, usuario:users(*)')
+      .single();
 
-    await historicoRepository.save({
-      chamadoId: chamado.id, tipo: 'EDICAO',
+    if (error) throw error;
+
+    await supabase.from('historicos').insert({
+      chamado_id: chamado.id,
+      tipo: 'EDICAO',
       descricao: `Anexo adicionado: ${file.originalname}`,
-      usuarioId: req.user!.id,
+      usuario_id: req.user!.id,
     });
 
-    const anexoCompleto = await anexoRepository.findOne({
-      where: { id: anexo.id }, relations: ['usuario'],
-    });
+    const result = toCamel(anexo);
+    if (result.usuario) result.usuario = sanitizeUser(result.usuario);
 
-    res.status(201).json(anexoCompleto);
+    res.status(201).json(result);
   } catch (error) {
     console.error('Upload anexo error:', error);
     res.status(500).json({ error: 'Erro ao enviar anexo' });
@@ -853,19 +1041,23 @@ router.post('/:id/anexos', upload.single('arquivo'), async (req: AuthRequest, re
 // GET /api/chamados/:id/anexos/:anexoId/download
 router.get('/:id/anexos/:anexoId/download', async (req: AuthRequest, res: Response) => {
   try {
-    const anexo = await anexoRepository.findOne({
-      where: { id: req.params.anexoId, chamadoId: req.params.id },
-    });
+    const { data: anexo } = await supabase
+      .from('anexos')
+      .select('nome_arquivo, nome_original')
+      .eq('id', req.params.anexoId)
+      .eq('chamado_id', req.params.id)
+      .single();
+
     if (!anexo) {
-      return res.status(404).json({ error: 'Anexo não encontrado' });
+      return res.status(404).json({ error: 'Anexo nao encontrado' });
     }
 
-    const filePath = path.join(UPLOAD_DIR, anexo.nomeArquivo);
+    const filePath = path.join(UPLOAD_DIR, anexo.nome_arquivo);
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Arquivo não encontrado no disco' });
+      return res.status(404).json({ error: 'Arquivo nao encontrado no disco' });
     }
 
-    res.download(filePath, anexo.nomeOriginal);
+    res.download(filePath, anexo.nome_original);
   } catch (error) {
     console.error('Download anexo error:', error);
     res.status(500).json({ error: 'Erro ao baixar anexo' });
@@ -875,22 +1067,27 @@ router.get('/:id/anexos/:anexoId/download', async (req: AuthRequest, res: Respon
 // DELETE /api/chamados/:id/anexos/:anexoId
 router.delete('/:id/anexos/:anexoId', async (req: AuthRequest, res: Response) => {
   try {
-    const anexo = await anexoRepository.findOne({
-      where: { id: req.params.anexoId, chamadoId: req.params.id },
-    });
+    const { data: anexo } = await supabase
+      .from('anexos')
+      .select('*')
+      .eq('id', req.params.anexoId)
+      .eq('chamado_id', req.params.id)
+      .single();
+
     if (!anexo) {
-      return res.status(404).json({ error: 'Anexo não encontrado' });
+      return res.status(404).json({ error: 'Anexo nao encontrado' });
     }
 
-    const filePath = path.join(UPLOAD_DIR, anexo.nomeArquivo);
+    const filePath = path.join(UPLOAD_DIR, anexo.nome_arquivo);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    await anexoRepository.remove(anexo);
+    await supabase.from('anexos').delete().eq('id', req.params.anexoId);
 
-    await historicoRepository.save({
-      chamadoId: req.params.id, tipo: 'EDICAO',
-      descricao: `Anexo removido: ${anexo.nomeOriginal}`,
-      usuarioId: req.user!.id,
+    await supabase.from('historicos').insert({
+      chamado_id: req.params.id,
+      tipo: 'EDICAO',
+      descricao: `Anexo removido: ${anexo.nome_original}`,
+      usuario_id: req.user!.id,
     });
 
     res.json({ message: 'Anexo removido com sucesso' });

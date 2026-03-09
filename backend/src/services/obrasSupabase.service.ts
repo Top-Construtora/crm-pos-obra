@@ -1,4 +1,11 @@
-import { supabase } from '../config/supabase.js';
+import { supabaseGio } from '../config/supabase.js';
+
+function getGioClient() {
+  if (!supabaseGio) {
+    throw new Error('Supabase GIO nao configurado. Verifique GIO_SUPABASE_URL e GIO_SUPABASE_ANON_KEY no .env');
+  }
+  return supabaseGio;
+}
 
 export interface ObraTop {
   id: string;
@@ -15,11 +22,11 @@ export interface ObraTop {
 
 export class ObrasSupabaseService {
   /**
-   * Busca todas as obras ativas da tabela obras_top
+   * Busca todas as obras ativas da tabela obras_top (banco GIO)
    */
   async listarObrasAtivas(): Promise<ObraTop[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getGioClient()
         .from('obras_top')
         .select('*')
         .order('nome_limpo', { ascending: true });
@@ -37,11 +44,11 @@ export class ObrasSupabaseService {
   }
 
   /**
-   * Busca uma obra específica por ID
+   * Busca uma obra especifica por ID
    */
   async buscarObraPorId(id: string): Promise<ObraTop | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getGioClient()
         .from('obras_top')
         .select('*')
         .eq('id', id)
@@ -64,7 +71,7 @@ export class ObrasSupabaseService {
    */
   async buscarObrasPorNome(nome: string): Promise<ObraTop[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getGioClient()
         .from('obras_top')
         .select('*')
         .ilike('nome_limpo', `%${nome}%`)

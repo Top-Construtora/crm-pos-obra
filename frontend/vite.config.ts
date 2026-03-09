@@ -12,10 +12,10 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
-    hmr: {
-      port: 3000,
-      protocol: 'ws',
-      host: 'localhost',
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
     },
     proxy: {
       '/api': {

@@ -1,19 +1,15 @@
 import { Router, Request, Response } from 'express';
-import { AppDataSource } from '../database/data-source.js';
-import { Chamado } from '../entities/Chamado.js';
-import { Historico } from '../entities/Historico.js';
+import { supabase } from '../config/supabase.js';
 import { calcularSLA } from '../utils/sla.js';
+import { toCamel } from '../utils/db.js';
 
 const router = Router();
-const chamadoRepository = AppDataSource.getRepository(Chamado);
-const historicoRepository = AppDataSource.getRepository(Historico);
 
 // GET /api/portal-cliente/rastrear/:numero
-// Permite rastrear um chamado pelo número e telefone/email do cliente
 router.get('/rastrear/:numero', async (req: Request, res: Response) => {
   try {
     const { numero } = req.params;
-    const { identificador } = req.query; // telefone ou email
+    const { identificador } = req.query;
 
     if (!identificador) {
       return res.status(400).json({ error: 'Informe o telefone ou email do cliente' });
@@ -21,22 +17,22 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
 
     const chamadoNum = parseInt(numero);
     if (isNaN(chamadoNum)) {
-      return res.status(400).json({ error: 'Número de chamado inválido' });
+      return res.status(400).json({ error: 'Numero de chamado invalido' });
     }
 
-    const chamado = await chamadoRepository.findOne({
-      where: { numero: chamadoNum },
-      relations: ['empreendimento', 'responsavel', 'historico', 'historico.usuario'],
-      order: {
-        historico: { criadoEm: 'DESC' },
-      },
-    });
+    const { data: chamadoRaw, error } = await supabase
+      .from('chamados')
+      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(nome), historico:historicos(*, usuario:users(nome))')
+      .eq('numero', chamadoNum)
+      .single();
 
-    if (!chamado) {
-      return res.status(404).json({ error: 'Chamado não encontrado' });
+    if (error || !chamadoRaw) {
+      return res.status(404).json({ error: 'Chamado nao encontrado' });
     }
 
-    // Verificar se o identificador corresponde ao cliente
+    const chamado = toCamel(chamadoRaw);
+
+    // Verificar identificador
     const identificadorLower = (identificador as string).toLowerCase().replace(/\D/g, '');
     const telefoneChamado = chamado.clienteTelefone.toLowerCase().replace(/\D/g, '');
     const emailChamado = chamado.clienteEmail?.toLowerCase() || '';
@@ -46,15 +42,14 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
       (identificador as string).toLowerCase() === emailChamado;
 
     if (!isAuthorized) {
-      return res.status(403).json({ error: 'Telefone ou email não corresponde ao chamado' });
+      return res.status(403).json({ error: 'Telefone ou email nao corresponde ao chamado' });
     }
 
-    // Retornar dados limitados para o cliente
     const response = {
       numero: chamado.numero,
       empreendimento: {
-        nome: chamado.empreendimento.nome,
-        endereco: chamado.empreendimento.endereco,
+        nome: chamado.empreendimento?.nome,
+        endereco: chamado.empreendimento?.endereco,
       },
       unidade: chamado.unidade,
       clienteNome: chamado.clienteNome,
@@ -63,19 +58,19 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
       descricao: chamado.descricao,
       prioridade: chamado.prioridade,
       status: chamado.status,
-      responsavel: chamado.responsavel ? {
-        nome: chamado.responsavel.nome,
-      } : null,
+      responsavel: chamado.responsavel ? { nome: chamado.responsavel.nome } : null,
       criadoEm: chamado.criadoEm,
       atualizadoEm: chamado.atualizadoEm,
       finalizadoEm: chamado.finalizadoEm,
       slaInfo: calcularSLA(chamado),
-      historico: chamado.historico.map((h) => ({
-        tipo: h.tipo,
-        descricao: h.descricao,
-        usuario: h.usuario ? h.usuario.nome : 'Sistema',
-        criadoEm: h.criadoEm,
-      })),
+      historico: (chamado.historico || [])
+        .sort((a: any, b: any) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime())
+        .map((h: any) => ({
+          tipo: h.tipo,
+          descricao: h.descricao,
+          usuario: h.usuario?.nome || 'Sistema',
+          criadoEm: h.criadoEm,
+        })),
     };
 
     res.json(response);
@@ -86,58 +81,59 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
 });
 
 // GET /api/portal-cliente/meus-chamados
-// Lista todos os chamados de um cliente
 router.get('/meus-chamados', async (req: Request, res: Response) => {
   try {
-    const { identificador } = req.query; // telefone ou email
+    const { identificador } = req.query;
 
     if (!identificador) {
       return res.status(400).json({ error: 'Informe o telefone ou email do cliente' });
     }
 
-    // Buscar por telefone ou email
     const identificadorStr = identificador as string;
-    const telefoneDigits = identificadorStr.replace(/\D/g, '');
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-      .leftJoinAndSelect('chamado.responsavel', 'responsavel')
-      .orderBy('chamado.criadoEm', 'DESC');
+    let query = supabase
+      .from('chamados')
+      .select('*, empreendimento:empreendimentos(nome), responsavel:users!responsavel_id(nome)')
+      .order('criado_em', { ascending: false });
 
-    // Se for email
     if (identificadorStr.includes('@')) {
-      queryBuilder.where('LOWER(chamado.cliente_email) = LOWER(:email)', {
-        email: identificadorStr,
-      });
+      query = query.ilike('cliente_email', identificadorStr);
     } else {
-      // Se for telefone
-      queryBuilder.where(
-        "REPLACE(REPLACE(REPLACE(REPLACE(chamado.cliente_telefone, '(', ''), ')', ''), ' ', ''), '-', '') = :telefone",
-        { telefone: telefoneDigits }
-      );
+      // Para telefone, buscar com ilike para flexibilidade
+      const telefoneDigits = identificadorStr.replace(/\D/g, '');
+      query = query.like('cliente_telefone', `%${telefoneDigits.slice(-8)}%`);
     }
 
-    const chamados = await queryBuilder.getMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
-    const response = chamados.map((chamado) => ({
-      numero: chamado.numero,
-      empreendimento: {
-        nome: chamado.empreendimento.nome,
-      },
-      unidade: chamado.unidade,
-      categoria: chamado.categoria,
-      descricao: chamado.descricao,
-      prioridade: chamado.prioridade,
-      status: chamado.status,
-      responsavel: chamado.responsavel ? {
-        nome: chamado.responsavel.nome,
-      } : null,
-      criadoEm: chamado.criadoEm,
-      atualizadoEm: chamado.atualizadoEm,
-      finalizadoEm: chamado.finalizadoEm,
-      slaInfo: calcularSLA(chamado),
-    }));
+    // Filtro extra para telefone (matching exato de digitos)
+    let filtered = chamados || [];
+    if (!identificadorStr.includes('@')) {
+      const telefoneDigits = identificadorStr.replace(/\D/g, '');
+      filtered = filtered.filter((c) => {
+        const cDigits = c.cliente_telefone.replace(/\D/g, '');
+        return cDigits === telefoneDigits;
+      });
+    }
+
+    const response = filtered.map((c) => {
+      const chamado = toCamel(c);
+      return {
+        numero: chamado.numero,
+        empreendimento: { nome: chamado.empreendimento?.nome },
+        unidade: chamado.unidade,
+        categoria: chamado.categoria,
+        descricao: chamado.descricao,
+        prioridade: chamado.prioridade,
+        status: chamado.status,
+        responsavel: chamado.responsavel ? { nome: chamado.responsavel.nome } : null,
+        criadoEm: chamado.criadoEm,
+        atualizadoEm: chamado.atualizadoEm,
+        finalizadoEm: chamado.finalizadoEm,
+        slaInfo: calcularSLA(chamado),
+      };
+    });
 
     res.json(response);
   } catch (error) {

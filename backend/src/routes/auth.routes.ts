@@ -1,12 +1,11 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { AppDataSource } from '../database/data-source.js';
-import { User } from '../entities/User.js';
+import { supabase } from '../config/supabase.js';
 import { authMiddleware, generateToken } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../types/index.js';
+import { toCamel, sanitizeUser } from '../utils/db.js';
 
 const router = Router();
-const userRepository = AppDataSource.getRepository(User);
 
 // POST /api/auth/login
 router.post('/login', async (req, res: Response) => {
@@ -14,25 +13,31 @@ router.post('/login', async (req, res: Response) => {
     const { email, senha } = req.body;
 
     if (!email || !senha) {
-      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+      return res.status(400).json({ error: 'Email e senha sao obrigatorios' });
     }
 
-    const user = await userRepository.findOne({ where: { email, ativo: true } });
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .eq('ativo', true)
+      .single();
 
-    if (!user) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
+    if (error || !user) {
+      return res.status(401).json({ error: 'Credenciais invalidas' });
     }
 
     const senhaValida = await bcrypt.compare(senha, user.senha);
 
     if (!senhaValida) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
+      return res.status(401).json({ error: 'Credenciais invalidas' });
     }
 
-    const token = generateToken(user);
+    const userCamel = toCamel(user);
+    const token = generateToken(userCamel);
 
     res.json({
-      user: user.toJSON(),
+      user: sanitizeUser(userCamel),
       token,
     });
   } catch (error) {
@@ -45,10 +50,10 @@ router.post('/login', async (req, res: Response) => {
 router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) {
-      return res.status(401).json({ error: 'Não autenticado' });
+      return res.status(401).json({ error: 'Nao autenticado' });
     }
 
-    res.json({ user: req.user.toJSON() });
+    res.json({ user: sanitizeUser(req.user) });
   } catch (error) {
     console.error('Get me error:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -57,7 +62,6 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
 
 // POST /api/auth/logout
 router.post('/logout', authMiddleware, (_req, res: Response) => {
-  // JWT não tem logout server-side, apenas remove no cliente
   res.json({ message: 'Logout realizado com sucesso' });
 });
 

@@ -1,5 +1,4 @@
 import { Request } from 'express';
-import { User } from '../entities/User.js';
 
 export type UserRole = 'ADMIN' | 'COORDENADOR' | 'TECNICO';
 export type ChamadoStatus = 'ABERTO' | 'EM_ANDAMENTO' | 'AGUARDANDO' | 'FINALIZADO';
@@ -17,8 +16,20 @@ export type HistoricoTipo = 'CRIACAO' | 'STATUS' | 'RESPONSAVEL' | 'EDICAO' | 'C
 export type NotificacaoTipo = 'NOVO_CHAMADO' | 'STATUS_ALTERADO' | 'ATRIBUICAO' | 'COMENTARIO' | 'SLA_ALERTA';
 export type StatusAtendimento = 'AGENDADO' | 'EM_ROTA' | 'NO_LOCAL' | 'CONCLUIDO' | 'CANCELADO';
 
+export interface UserData {
+  id: string;
+  nome: string;
+  email: string;
+  senha?: string;
+  role: UserRole;
+  ativo: boolean;
+  avatar?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
 export interface AuthRequest extends Request {
-  user?: User;
+  user?: UserData;
 }
 
 export interface JwtPayload {

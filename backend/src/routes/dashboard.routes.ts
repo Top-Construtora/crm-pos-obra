@@ -1,71 +1,72 @@
 import { Router, Response } from 'express';
-import { AppDataSource } from '../database/data-source.js';
-import { Chamado } from '../entities/Chamado.js';
-import { User } from '../entities/User.js';
+import { supabase } from '../config/supabase.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../types/index.js';
 import { calcularSLA } from '../utils/sla.js';
+import { toCamel, sanitizeUser } from '../utils/db.js';
 
 const router = Router();
-const chamadoRepository = AppDataSource.getRepository(Chamado);
-const userRepository = AppDataSource.getRepository(User);
 
-// Aplicar auth em todas as rotas
 router.use(authMiddleware);
+
+// Helper: buscar chamados com filtro de tecnico
+async function fetchChamados(user: any, filters: any = {}, selectFields = '*') {
+  let query = supabase.from('chamados').select(selectFields);
+
+  if (user.role === 'TECNICO') {
+    query = query.eq('responsavel_id', user.id);
+  }
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (key === 'status_in') {
+      query = query.in('status', value as string[]);
+    } else if (key === 'gte') {
+      const [col, val] = value as [string, string];
+      query = query.gte(col, val);
+    } else {
+      query = query.eq(key, value);
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(toCamel);
+}
 
 // GET /api/dashboard/stats
 router.get('/stats', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
 
-    // Base query
-    let whereClause = {};
+    let query = supabase.from('chamados').select('status, sla_horas, criado_em');
     if (user.role === 'TECNICO') {
-      whereClause = { responsavelId: user.id };
+      query = query.eq('responsavel_id', user.id);
     }
 
-    // Contar por status
-    const [total, abertos, emAndamento, aguardando, finalizados] = await Promise.all([
-      chamadoRepository.count({ where: whereClause }),
-      chamadoRepository.count({ where: { ...whereClause, status: 'ABERTO' } }),
-      chamadoRepository.count({ where: { ...whereClause, status: 'EM_ANDAMENTO' } }),
-      chamadoRepository.count({ where: { ...whereClause, status: 'AGUARDANDO' } }),
-      chamadoRepository.count({ where: { ...whereClause, status: 'FINALIZADO' } }),
-    ]);
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
-    // Contar vencidos e próximos do vencimento
-    const chamadosAtivos = await chamadoRepository.find({
-      where: [
-        { ...whereClause, status: 'ABERTO' },
-        { ...whereClause, status: 'EM_ANDAMENTO' },
-        { ...whereClause, status: 'AGUARDANDO' },
-      ],
-    });
+    const all = (chamados || []).map(toCamel);
+    const total = all.length;
+    const abertos = all.filter((c) => c.status === 'ABERTO').length;
+    const emAndamento = all.filter((c) => c.status === 'EM_ANDAMENTO').length;
+    const aguardando = all.filter((c) => c.status === 'AGUARDANDO').length;
+    const finalizados = all.filter((c) => c.status === 'FINALIZADO').length;
 
+    const ativos = all.filter((c) => ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO'].includes(c.status));
     let vencidos = 0;
     let proximosVencimento = 0;
 
-    chamadosAtivos.forEach((chamado) => {
+    ativos.forEach((chamado) => {
       const slaInfo = calcularSLA(chamado);
-      if (slaInfo.status === 'VENCIDO') {
-        vencidos++;
-      } else if (slaInfo.status === 'PROXIMO_VENCIMENTO') {
-        proximosVencimento++;
-      }
+      if (slaInfo.status === 'VENCIDO') vencidos++;
+      else if (slaInfo.status === 'PROXIMO_VENCIMENTO') proximosVencimento++;
     });
 
-    res.json({
-      total,
-      abertos,
-      emAndamento,
-      aguardando,
-      finalizados,
-      vencidos,
-      proximosVencimento,
-    });
+    res.json({ total, abertos, emAndamento, aguardando, finalizados, vencidos, proximosVencimento });
   } catch (error) {
     console.error('Get stats error:', error);
-    res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+    res.status(500).json({ error: 'Erro ao buscar estatisticas' });
   }
 });
 
@@ -74,27 +75,25 @@ router.get('/sla-proximos', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-      .leftJoinAndSelect('chamado.responsavel', 'responsavel')
-      .where('chamado.status IN (:...statuses)', {
-        statuses: ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO'],
-      })
-      .orderBy('chamado.criadoEm', 'ASC');
+    let query = supabase
+      .from('chamados')
+      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*)')
+      .in('status', ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO'])
+      .order('criado_em', { ascending: true });
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavelId = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    const chamados = await queryBuilder.getMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
-    // Filtrar e ordenar por SLA
-    const chamadosComSLA = chamados
-      .map((chamado) => ({
-        ...chamado,
-        slaInfo: calcularSLA(chamado),
-      }))
+    const chamadosComSLA = (chamados || [])
+      .map((c) => {
+        const chamado = toCamel(c);
+        if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
+        return { ...chamado, slaInfo: calcularSLA(chamado) };
+      })
       .filter((c) => c.slaInfo.status === 'VENCIDO' || c.slaInfo.status === 'PROXIMO_VENCIMENTO')
       .sort((a, b) => a.slaInfo.tempoRestante - b.slaInfo.tempoRestante)
       .slice(0, 10);
@@ -102,7 +101,7 @@ router.get('/sla-proximos', async (req: AuthRequest, res: Response) => {
     res.json(chamadosComSLA);
   } catch (error) {
     console.error('Get sla proximos error:', error);
-    res.status(500).json({ error: 'Erro ao buscar chamados próximos do SLA' });
+    res.status(500).json({ error: 'Erro ao buscar chamados proximos do SLA' });
   }
 });
 
@@ -111,25 +110,26 @@ router.get('/recentes', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-      .leftJoinAndSelect('chamado.responsavel', 'responsavel')
-      .orderBy('chamado.criadoEm', 'DESC')
-      .take(5);
+    let query = supabase
+      .from('chamados')
+      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*)')
+      .order('criado_em', { ascending: false })
+      .limit(5);
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavelId = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    const chamados = await queryBuilder.getMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
-    const chamadosComSLA = chamados.map((chamado) => ({
-      ...chamado,
-      slaInfo: calcularSLA(chamado),
-    }));
+    const result = (chamados || []).map((c) => {
+      const chamado = toCamel(c);
+      if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
+      return { ...chamado, slaInfo: calcularSLA(chamado) };
+    });
 
-    res.json(chamadosComSLA);
+    res.json(result);
   } catch (error) {
     console.error('Get recentes error:', error);
     res.status(500).json({ error: 'Erro ao buscar chamados recentes' });
@@ -140,19 +140,14 @@ router.get('/recentes', async (req: AuthRequest, res: Response) => {
 router.get('/por-categoria', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
+    const chamados = await fetchChamados(user, {}, 'categoria');
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .select('chamado.categoria', 'categoria')
-      .addSelect('COUNT(*)', 'total')
-      .groupBy('chamado.categoria');
+    const map = new Map<string, number>();
+    chamados.forEach((c) => {
+      map.set(c.categoria, (map.get(c.categoria) || 0) + 1);
+    });
 
-    if (user.role === 'TECNICO') {
-      queryBuilder.where('chamado.responsavelId = :userId', { userId: user.id });
-    }
-
-    const result = await queryBuilder.getRawMany();
-
+    const result = Array.from(map.entries()).map(([categoria, total]) => ({ categoria, total }));
     res.json(result);
   } catch (error) {
     console.error('Get por categoria error:', error);
@@ -165,24 +160,34 @@ router.get('/por-periodo', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const dias = parseInt(req.query.dias as string) || 30;
+    const dataLimite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .select("strftime('%Y-%m-%d', chamado.criado_em)", 'data')
-      .addSelect('COUNT(*)', 'total')
-      .where("chamado.criado_em >= datetime('now', :dias)", { dias: `-${dias} days` })
-      .groupBy("strftime('%Y-%m-%d', chamado.criado_em)")
-      .orderBy("strftime('%Y-%m-%d', chamado.criado_em)", 'ASC');
+    let query = supabase
+      .from('chamados')
+      .select('criado_em')
+      .gte('criado_em', dataLimite);
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavel_id = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    const result = await queryBuilder.getRawMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
+
+    const map = new Map<string, number>();
+    (chamados || []).forEach((c) => {
+      const data = new Date(c.criado_em).toISOString().slice(0, 10);
+      map.set(data, (map.get(data) || 0) + 1);
+    });
+
+    const result = Array.from(map.entries())
+      .map(([data, total]) => ({ data, total }))
+      .sort((a, b) => a.data.localeCompare(b.data));
+
     res.json(result);
   } catch (error) {
     console.error('Get por periodo error:', error);
-    res.status(500).json({ error: 'Erro ao buscar chamados por período' });
+    res.status(500).json({ error: 'Erro ao buscar chamados por periodo' });
   }
 });
 
@@ -191,28 +196,41 @@ router.get('/tempo-resolucao', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .select("strftime('%Y-%m', chamado.criado_em)", 'mes')
-      .addSelect(
-        "ROUND(AVG((julianday(chamado.finalizado_em) - julianday(chamado.criado_em)) * 24), 1)",
-        'mediaHoras'
-      )
-      .addSelect('COUNT(*)', 'total')
-      .where('chamado.status = :status', { status: 'FINALIZADO' })
-      .andWhere('chamado.finalizado_em IS NOT NULL')
-      .groupBy("strftime('%Y-%m', chamado.criado_em)")
-      .orderBy("strftime('%Y-%m', chamado.criado_em)", 'ASC');
+    let query = supabase
+      .from('chamados')
+      .select('criado_em, finalizado_em')
+      .eq('status', 'FINALIZADO')
+      .not('finalizado_em', 'is', null);
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavel_id = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    const result = await queryBuilder.getRawMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
+
+    const mesMap = new Map<string, { totalHoras: number; count: number }>();
+    (chamados || []).forEach((c) => {
+      const mes = new Date(c.criado_em).toISOString().slice(0, 7);
+      const horas = (new Date(c.finalizado_em).getTime() - new Date(c.criado_em).getTime()) / (1000 * 60 * 60);
+      const entry = mesMap.get(mes) || { totalHoras: 0, count: 0 };
+      entry.totalHoras += horas;
+      entry.count++;
+      mesMap.set(mes, entry);
+    });
+
+    const result = Array.from(mesMap.entries())
+      .map(([mes, { totalHoras, count }]) => ({
+        mes,
+        mediaHoras: Math.round((totalHoras / count) * 10) / 10,
+        total: count,
+      }))
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+
     res.json(result);
   } catch (error) {
     console.error('Get tempo resolucao error:', error);
-    res.status(500).json({ error: 'Erro ao buscar tempo de resolução' });
+    res.status(500).json({ error: 'Erro ao buscar tempo de resolucao' });
   }
 });
 
@@ -221,41 +239,36 @@ router.get('/sla-compliance', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const dias = parseInt(req.query.dias as string) || 30;
+    const dataLimite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .where('chamado.status = :status', { status: 'FINALIZADO' })
-      .andWhere('chamado.finalizado_em IS NOT NULL')
-      .andWhere("chamado.criado_em >= datetime('now', :dias)", { dias: `-${dias} days` });
+    let query = supabase
+      .from('chamados')
+      .select('criado_em, finalizado_em, sla_horas')
+      .eq('status', 'FINALIZADO')
+      .not('finalizado_em', 'is', null)
+      .gte('criado_em', dataLimite);
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavel_id = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    const chamados = await queryBuilder.getMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
-    // Group by week
     const weekMap = new Map<string, { dentro: number; fora: number }>();
-    chamados.forEach((c) => {
-      const criadoEm = new Date(c.criadoEm);
-      // Get ISO week start (Monday)
+    (chamados || []).forEach((c) => {
+      const criadoEm = new Date(c.criado_em);
       const day = criadoEm.getDay();
       const diff = criadoEm.getDate() - day + (day === 0 ? -6 : 1);
       const weekStart = new Date(criadoEm);
       weekStart.setDate(diff);
       const key = weekStart.toISOString().slice(0, 10);
 
-      if (!weekMap.has(key)) {
-        weekMap.set(key, { dentro: 0, fora: 0 });
-      }
+      if (!weekMap.has(key)) weekMap.set(key, { dentro: 0, fora: 0 });
       const entry = weekMap.get(key)!;
-      const finalizadoEm = new Date(c.finalizadoEm!);
-      const horasResolucao = (finalizadoEm.getTime() - criadoEm.getTime()) / (1000 * 60 * 60);
-      if (horasResolucao <= c.slaHoras) {
-        entry.dentro++;
-      } else {
-        entry.fora++;
-      }
+      const horasResolucao = (new Date(c.finalizado_em).getTime() - criadoEm.getTime()) / (1000 * 60 * 60);
+      if (horasResolucao <= c.sla_horas) entry.dentro++;
+      else entry.fora++;
     });
 
     const result = Array.from(weekMap.entries())
@@ -278,56 +291,52 @@ router.get('/sla-compliance', async (req: AuthRequest, res: Response) => {
 // GET /api/dashboard/por-tecnico
 router.get('/por-tecnico', async (req: AuthRequest, res: Response) => {
   try {
-    const tecnicos = await userRepository.find({
-      where: { ativo: true },
+    const { data: tecnicos, error: tecError } = await supabase
+      .from('users')
+      .select('id, nome, role')
+      .eq('ativo', true);
+
+    if (tecError) throw tecError;
+
+    // Buscar todos chamados de uma vez
+    const { data: todosChamados, error: chamError } = await supabase
+      .from('chamados')
+      .select('responsavel_id, status, criado_em, finalizado_em');
+
+    if (chamError) throw chamError;
+
+    const result = (tecnicos || []).map((tecnico) => {
+      const meusChamados = (todosChamados || []).filter((c) => c.responsavel_id === tecnico.id);
+      const atribuidos = meusChamados.length;
+      const finalizados = meusChamados.filter((c) => c.status === 'FINALIZADO').length;
+      const emAberto = meusChamados.filter((c) => ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO'].includes(c.status)).length;
+
+      const finalizadosComTempo = meusChamados.filter((c) => c.status === 'FINALIZADO' && c.finalizado_em);
+      let mediaHoras = 0;
+      if (finalizadosComTempo.length > 0) {
+        const totalHoras = finalizadosComTempo.reduce((sum, c) => {
+          return sum + (new Date(c.finalizado_em).getTime() - new Date(c.criado_em).getTime()) / (1000 * 60 * 60);
+        }, 0);
+        mediaHoras = Math.round((totalHoras / finalizadosComTempo.length) * 10) / 10;
+      }
+
+      return {
+        id: tecnico.id,
+        nome: tecnico.nome,
+        role: tecnico.role,
+        atribuidos,
+        finalizados,
+        emAberto,
+        mediaHoras,
+        taxaResolucao: atribuidos > 0 ? Math.round((finalizados / atribuidos) * 100) : 0,
+      };
     });
 
-    const result = await Promise.all(
-      tecnicos.map(async (tecnico) => {
-        const [atribuidos, finalizados] = await Promise.all([
-          chamadoRepository.count({ where: { responsavelId: tecnico.id } }),
-          chamadoRepository.count({ where: { responsavelId: tecnico.id, status: 'FINALIZADO' } }),
-        ]);
-
-        // Average resolution time for completed chamados
-        const tempoQuery = await chamadoRepository
-          .createQueryBuilder('chamado')
-          .select(
-            "ROUND(AVG((julianday(chamado.finalizado_em) - julianday(chamado.criado_em)) * 24), 1)",
-            'mediaHoras'
-          )
-          .where('chamado.responsavel_id = :id', { id: tecnico.id })
-          .andWhere('chamado.status = :status', { status: 'FINALIZADO' })
-          .andWhere('chamado.finalizado_em IS NOT NULL')
-          .getRawOne();
-
-        const emAberto = await chamadoRepository.count({
-          where: [
-            { responsavelId: tecnico.id, status: 'ABERTO' },
-            { responsavelId: tecnico.id, status: 'EM_ANDAMENTO' },
-            { responsavelId: tecnico.id, status: 'AGUARDANDO' },
-          ],
-        });
-
-        return {
-          id: tecnico.id,
-          nome: tecnico.nome,
-          role: tecnico.role,
-          atribuidos,
-          finalizados,
-          emAberto,
-          mediaHoras: parseFloat(tempoQuery?.mediaHoras) || 0,
-          taxaResolucao: atribuidos > 0 ? Math.round((finalizados / atribuidos) * 100) : 0,
-        };
-      })
-    );
-
-    // Sort by finalizados desc
     result.sort((a, b) => b.finalizados - a.finalizados);
     res.json(result);
   } catch (error) {
     console.error('Get por tecnico error:', error);
-    res.status(500).json({ error: 'Erro ao buscar dados por técnico' });
+    res.status(500).json({ error: 'Erro ao buscar dados por tecnico' });
   }
 });
 
@@ -335,18 +344,14 @@ router.get('/por-tecnico', async (req: AuthRequest, res: Response) => {
 router.get('/por-status', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
+    const chamados = await fetchChamados(user, {}, 'status');
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .select('chamado.status', 'status')
-      .addSelect('COUNT(*)', 'total')
-      .groupBy('chamado.status');
+    const map = new Map<string, number>();
+    chamados.forEach((c) => {
+      map.set(c.status, (map.get(c.status) || 0) + 1);
+    });
 
-    if (user.role === 'TECNICO') {
-      queryBuilder.where('chamado.responsavel_id = :userId', { userId: user.id });
-    }
-
-    const result = await queryBuilder.getRawMany();
+    const result = Array.from(map.entries()).map(([status, total]) => ({ status, total }));
     res.json(result);
   } catch (error) {
     console.error('Get por status error:', error);
@@ -355,140 +360,142 @@ router.get('/por-status', async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/dashboard/reincidencia?dias=90
-// Identifica chamados recorrentes (mesma unidade, categoria similar em período)
 router.get('/reincidencia', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const dias = parseInt(req.query.dias as string) || 90;
+    const dataLimite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .select('chamado.empreendimento_id', 'empreendimentoId')
-      .addSelect('chamado.unidade', 'unidade')
-      .addSelect('chamado.categoria', 'categoria')
-      .addSelect('COUNT(*)', 'total')
-      .where("chamado.criado_em >= datetime('now', :dias)", { dias: `-${dias} days` })
-      .groupBy('chamado.empreendimento_id, chamado.unidade, chamado.categoria')
-      .having('COUNT(*) > 1')
-      .orderBy('COUNT(*)', 'DESC');
+    let query = supabase
+      .from('chamados')
+      .select('*, empreendimento:empreendimentos(nome)')
+      .gte('criado_em', dataLimite);
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavel_id = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    const result = await queryBuilder.getRawMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
-    // Enriquecer com informações dos chamados
-    const enriched = await Promise.all(
-      result.map(async (item) => {
-        const chamados = await chamadoRepository
-          .createQueryBuilder('chamado')
-          .leftJoinAndSelect('chamado.empreendimento', 'empreendimento')
-          .where('chamado.empreendimento_id = :empId', { empId: item.empreendimentoId })
-          .andWhere('chamado.unidade = :unidade', { unidade: item.unidade })
-          .andWhere('chamado.categoria = :categoria', { categoria: item.categoria })
-          .andWhere("chamado.criado_em >= datetime('now', :dias)", { dias: `-${dias} days` })
-          .orderBy('chamado.criado_em', 'DESC')
-          .getMany();
+    // Group by empreendimento_id + unidade + categoria
+    const groupMap = new Map<string, any[]>();
+    (chamados || []).forEach((c) => {
+      const key = `${c.empreendimento_id}|${c.unidade}|${c.categoria}`;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key)!.push(c);
+    });
 
-        return {
-          empreendimento: chamados[0]?.empreendimento?.nome || 'N/A',
-          unidade: item.unidade,
-          categoria: item.categoria,
-          total: parseInt(item.total),
-          chamados: chamados.map((c) => ({
+    const enriched = Array.from(groupMap.entries())
+      .filter(([, items]) => items.length > 1)
+      .map(([, items]) => ({
+        empreendimento: items[0]?.empreendimento?.nome || 'N/A',
+        unidade: items[0].unidade,
+        categoria: items[0].categoria,
+        total: items.length,
+        chamados: items
+          .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
+          .map((c) => ({
             numero: c.numero,
             descricao: c.descricao,
             status: c.status,
-            criadoEm: c.criadoEm,
+            criadoEm: c.criado_em,
           })),
-        };
-      })
-    );
+      }))
+      .sort((a, b) => b.total - a.total);
 
     res.json(enriched);
   } catch (error) {
     console.error('Get reincidencia error:', error);
-    res.status(500).json({ error: 'Erro ao buscar reincidências' });
+    res.status(500).json({ error: 'Erro ao buscar reincidencias' });
   }
 });
 
 // GET /api/dashboard/tempo-medio-categoria
-// Tempo médio de resolução por categoria
 router.get('/tempo-medio-categoria', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .select('chamado.categoria', 'categoria')
-      .addSelect(
-        "ROUND(AVG((julianday(chamado.finalizado_em) - julianday(chamado.criado_em)) * 24), 1)",
-        'mediaHoras'
-      )
-      .addSelect('COUNT(*)', 'total')
-      .where('chamado.status = :status', { status: 'FINALIZADO' })
-      .andWhere('chamado.finalizado_em IS NOT NULL')
-      .groupBy('chamado.categoria')
-      .orderBy('mediaHoras', 'DESC');
+    let query = supabase
+      .from('chamados')
+      .select('categoria, criado_em, finalizado_em')
+      .eq('status', 'FINALIZADO')
+      .not('finalizado_em', 'is', null);
 
     if (user.role === 'TECNICO') {
-      queryBuilder.andWhere('chamado.responsavel_id = :userId', { userId: user.id });
+      query = query.eq('responsavel_id', user.id);
     }
 
-    const result = await queryBuilder.getRawMany();
+    const { data: chamados, error } = await query;
+    if (error) throw error;
+
+    const catMap = new Map<string, { totalHoras: number; count: number }>();
+    (chamados || []).forEach((c) => {
+      const horas = (new Date(c.finalizado_em).getTime() - new Date(c.criado_em).getTime()) / (1000 * 60 * 60);
+      const entry = catMap.get(c.categoria) || { totalHoras: 0, count: 0 };
+      entry.totalHoras += horas;
+      entry.count++;
+      catMap.set(c.categoria, entry);
+    });
+
+    const result = Array.from(catMap.entries())
+      .map(([categoria, { totalHoras, count }]) => ({
+        categoria,
+        mediaHoras: Math.round((totalHoras / count) * 10) / 10,
+        total: count,
+      }))
+      .sort((a, b) => b.mediaHoras - a.mediaHoras);
+
     res.json(result);
   } catch (error) {
     console.error('Get tempo medio categoria error:', error);
-    res.status(500).json({ error: 'Erro ao buscar tempo médio por categoria' });
+    res.status(500).json({ error: 'Erro ao buscar tempo medio por categoria' });
   }
 });
 
-// GET /api/dashboard/taxa-primeira-vez
-// Porcentagem de chamados resolvidos na primeira visita
+// GET /api/dashboard/taxa-primeira-vez?dias=30
 router.get('/taxa-primeira-vez', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const dias = parseInt(req.query.dias as string) || 30;
+    const dataLimite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
 
-    let whereClause = {};
+    let countQuery = supabase
+      .from('chamados')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'FINALIZADO');
+
     if (user.role === 'TECNICO') {
-      whereClause = { responsavelId: user.id };
+      countQuery = countQuery.eq('responsavel_id', user.id);
     }
 
-    const totalFinalizados = await chamadoRepository.count({
-      where: {
-        ...whereClause,
-        status: 'FINALIZADO',
-      },
-    });
+    const { count: totalFinalizados } = await countQuery;
 
-    // Chamados que passaram apenas por: ABERTO -> FINALIZADO ou ABERTO -> EM_ANDAMENTO -> FINALIZADO
-    // (sem passar por AGUARDANDO, que geralmente indica necessidade de retorno)
-    const chamadosSimples = await chamadoRepository
-      .createQueryBuilder('chamado')
-      .leftJoinAndSelect('chamado.historico', 'historico')
-      .where('chamado.status = :status', { status: 'FINALIZADO' })
-      .andWhere("chamado.criado_em >= datetime('now', :dias)", { dias: `-${dias} days` })
-      .getMany();
+    let query = supabase
+      .from('chamados')
+      .select('id, historico:historicos(tipo, dados_novos)')
+      .eq('status', 'FINALIZADO')
+      .gte('criado_em', dataLimite);
+
+    if (user.role === 'TECNICO') {
+      query = query.eq('responsavel_id', user.id);
+    }
+
+    const { data: chamados, error } = await query;
+    if (error) throw error;
 
     let primeiraVez = 0;
-    chamadosSimples.forEach((chamado) => {
+    (chamados || []).forEach((chamado: any) => {
       const temAguardando = chamado.historico?.some(
-        (h) => h.tipo === 'STATUS' && h.dadosNovos?.includes('AGUARDANDO')
+        (h: any) => h.tipo === 'STATUS' && h.dados_novos?.includes('AGUARDANDO')
       );
-      if (!temAguardando) {
-        primeiraVez++;
-      }
+      if (!temAguardando) primeiraVez++;
     });
 
-    const taxa = totalFinalizados > 0 ? Math.round((primeiraVez / totalFinalizados) * 100) : 0;
+    const total = totalFinalizados || 0;
+    const taxa = total > 0 ? Math.round((primeiraVez / total) * 100) : 0;
 
-    res.json({
-      total: totalFinalizados,
-      primeiraVez,
-      taxa,
-    });
+    res.json({ total, primeiraVez, taxa });
   } catch (error) {
     console.error('Get taxa primeira vez error:', error);
     res.status(500).json({ error: 'Erro ao buscar taxa de primeira vez' });
@@ -496,27 +503,24 @@ router.get('/taxa-primeira-vez', async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/dashboard/prioridade-distribuicao
-// Distribuição de chamados por prioridade
 router.get('/prioridade-distribuicao', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
+    const chamados = await fetchChamados(user, {}, 'prioridade');
 
-    const queryBuilder = chamadoRepository
-      .createQueryBuilder('chamado')
-      .select('chamado.prioridade', 'prioridade')
-      .addSelect('COUNT(*)', 'total')
-      .groupBy('chamado.prioridade')
-      .orderBy('COUNT(*)', 'DESC');
+    const map = new Map<string, number>();
+    chamados.forEach((c) => {
+      map.set(c.prioridade, (map.get(c.prioridade) || 0) + 1);
+    });
 
-    if (user.role === 'TECNICO') {
-      queryBuilder.where('chamado.responsavel_id = :userId', { userId: user.id });
-    }
+    const result = Array.from(map.entries())
+      .map(([prioridade, total]) => ({ prioridade, total }))
+      .sort((a, b) => b.total - a.total);
 
-    const result = await queryBuilder.getRawMany();
     res.json(result);
   } catch (error) {
     console.error('Get prioridade distribuicao error:', error);
-    res.status(500).json({ error: 'Erro ao buscar distribuição de prioridade' });
+    res.status(500).json({ error: 'Erro ao buscar distribuicao de prioridade' });
   }
 });
 

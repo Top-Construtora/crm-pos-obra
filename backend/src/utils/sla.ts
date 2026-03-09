@@ -1,5 +1,3 @@
-import { Chamado } from '../entities/Chamado.js';
-
 export type SLAStatus = 'NO_PRAZO' | 'PROXIMO_VENCIMENTO' | 'VENCIDO';
 
 export interface SLAInfo {
@@ -9,7 +7,7 @@ export interface SLAInfo {
   dataLimite: Date;
 }
 
-export function calcularSLA(chamado: Chamado): SLAInfo {
+export function calcularSLA(chamado: any): SLAInfo {
   // Se já está finalizado, retorna no prazo
   if (chamado.status === 'FINALIZADO') {
     return {

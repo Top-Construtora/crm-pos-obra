@@ -1,12 +1,10 @@
 import { Router, Response } from 'express';
-import { AppDataSource } from '../database/data-source.js';
-import { Settings } from '../entities/Settings.js';
+import { supabase } from '../config/supabase.js';
 import { authMiddleware, requireRoles } from '../middlewares/auth.middleware.js';
+import { toCamel } from '../utils/db.js';
 
 const router = Router();
-const settingsRepository = AppDataSource.getRepository(Settings);
 
-// All settings routes require admin
 router.use(authMiddleware);
 router.use(requireRoles('ADMIN'));
 
@@ -21,14 +19,17 @@ const DEFAULTS: Record<string, string> = {
 // GET /api/settings
 router.get('/', async (_req, res: Response) => {
   try {
-    const settings = await settingsRepository.find();
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('*');
 
-    // Merge defaults with saved settings
-    const result: Record<string, { valor: string; atualizadoEm?: Date }> = {};
+    if (error) throw error;
+
+    const result: Record<string, { valor: string; atualizadoEm?: string }> = {};
     for (const [chave, valor] of Object.entries(DEFAULTS)) {
-      const saved = settings.find((s) => s.chave === chave);
+      const saved = (settings || []).find((s) => s.chave === chave);
       result[chave] = saved
-        ? { valor: saved.valor, atualizadoEm: saved.atualizadoEm }
+        ? { valor: saved.valor, atualizadoEm: saved.atualizado_em }
         : { valor };
     }
 
@@ -49,15 +50,37 @@ router.put('/:chave', async (req, res: Response) => {
       return res.status(400).json({ error: 'Valor e obrigatorio' });
     }
 
-    let setting = await settingsRepository.findOne({ where: { chave } });
-    if (!setting) {
-      setting = settingsRepository.create({ chave, valor: String(valor) });
+    // Upsert: try update first, then insert
+    const { data: existing } = await supabase
+      .from('settings')
+      .select('id')
+      .eq('chave', chave)
+      .single();
+
+    let setting;
+    if (existing) {
+      const { data, error } = await supabase
+        .from('settings')
+        .update({ valor: String(valor) })
+        .eq('chave', chave)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setting = data;
     } else {
-      setting.valor = String(valor);
+      const { data, error } = await supabase
+        .from('settings')
+        .insert({ chave, valor: String(valor) })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setting = data;
     }
 
-    await settingsRepository.save(setting);
-    res.json({ chave: setting.chave, valor: setting.valor, atualizadoEm: setting.atualizadoEm });
+    const result = toCamel(setting);
+    res.json({ chave: result.chave, valor: result.valor, atualizadoEm: result.atualizadoEm });
   } catch (error) {
     console.error('Update setting error:', error);
     res.status(500).json({ error: 'Erro ao atualizar configuracao' });

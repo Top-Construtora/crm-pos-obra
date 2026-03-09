@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import 'reflect-metadata';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -7,7 +6,7 @@ import helmet from 'helmet';
 import fs from 'fs';
 import path from 'path';
 import { initSocket } from './socket.js';
-import { AppDataSource } from './database/data-source.js';
+import { supabase } from './config/supabase.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { usersRoutes } from './routes/users.routes.js';
 import { empreendimentosRoutes } from './routes/empreendimentos.routes.js';
@@ -55,28 +54,24 @@ app.use('/api/agenda', agendaRoutes);
 app.use('/uploads', express.static(uploadsDir));
 
 // Health check
-app.get('/api/health', (_, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', async (_, res) => {
+  // Test Supabase connection
+  const { error } = await supabase.from('settings').select('id').limit(1);
+  res.json({
+    status: error ? 'degraded' : 'ok',
+    timestamp: new Date().toISOString(),
+    database: error ? `error: ${error.message}` : 'connected',
+  });
 });
 
 // Error middleware
 app.use(errorMiddleware);
 
-// Initialize database and start server
-AppDataSource.initialize()
-  .then(async () => {
-    console.log('Database initialized');
+// Initialize Socket.IO and start server
+initSocket(server);
 
-    // Initialize Socket.IO
-    initSocket(server);
-
-    server.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error('Error initializing database:', error);
-    process.exit(1);
-  });
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
 
 export default app;

@@ -3,14 +3,13 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { AppDataSource } from '../database/data-source.js';
-import { User } from '../entities/User.js';
+import { supabase } from '../config/supabase.js';
 import { authMiddleware, requireRoles } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../types/index.js';
 import { UPLOAD_DIR } from '../middlewares/upload.middleware.js';
+import { toCamel, sanitizeUser, sanitizeUsers } from '../utils/db.js';
 
 const router = Router();
-const userRepository = AppDataSource.getRepository(User);
 
 // Avatar upload config (images only, 2MB)
 const avatarUpload = multer({
@@ -38,9 +37,14 @@ router.use(authMiddleware);
 // GET /api/users/me
 router.get('/me', async (req: AuthRequest, res: Response) => {
   try {
-    const user = await userRepository.findOne({ where: { id: req.user!.id } });
-    if (!user) return res.status(404).json({ error: 'Usuario nao encontrado' });
-    res.json(user.toJSON());
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', req.user!.id)
+      .single();
+
+    if (error || !user) return res.status(404).json({ error: 'Usuario nao encontrado' });
+    res.json(sanitizeUser(toCamel(user)));
   } catch (error) {
     console.error('Get me error:', error);
     res.status(500).json({ error: 'Erro ao buscar perfil' });
@@ -50,19 +54,30 @@ router.get('/me', async (req: AuthRequest, res: Response) => {
 // PUT /api/users/me
 router.put('/me', async (req: AuthRequest, res: Response) => {
   try {
-    const user = await userRepository.findOne({ where: { id: req.user!.id } });
-    if (!user) return res.status(404).json({ error: 'Usuario nao encontrado' });
-
     const { nome, email } = req.body;
-    if (email && email !== user.email) {
-      const existing = await userRepository.findOne({ where: { email } });
-      if (existing) return res.status(400).json({ error: 'Email ja cadastrado' });
-      user.email = email;
-    }
-    if (nome) user.nome = nome;
+    const updates: any = {};
 
-    await userRepository.save(user);
-    res.json(user.toJSON());
+    if (email && email !== req.user!.email) {
+      const { data: existing } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (existing) return res.status(400).json({ error: 'Email ja cadastrado' });
+      updates.email = email;
+    }
+    if (nome) updates.nome = nome;
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', req.user!.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(sanitizeUser(toCamel(user)));
   } catch (error) {
     console.error('Update me error:', error);
     res.status(500).json({ error: 'Erro ao atualizar perfil' });
@@ -72,7 +87,12 @@ router.put('/me', async (req: AuthRequest, res: Response) => {
 // PATCH /api/users/me/password
 router.patch('/me/password', async (req: AuthRequest, res: Response) => {
   try {
-    const user = await userRepository.findOne({ where: { id: req.user!.id } });
+    const { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', req.user!.id)
+      .single();
+
     if (!user) return res.status(404).json({ error: 'Usuario nao encontrado' });
 
     const { senhaAtual, novaSenha, confirmarSenha } = req.body;
@@ -91,8 +111,9 @@ router.patch('/me/password', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Senha atual incorreta' });
     }
 
-    user.senha = await bcrypt.hash(novaSenha, 10);
-    await userRepository.save(user);
+    const senhaHash = await bcrypt.hash(novaSenha, 10);
+    await supabase.from('users').update({ senha: senhaHash }).eq('id', req.user!.id);
+
     res.json({ message: 'Senha alterada com sucesso' });
   } catch (error) {
     console.error('Change password error:', error);
@@ -103,16 +124,14 @@ router.patch('/me/password', async (req: AuthRequest, res: Response) => {
 // POST /api/users/me/avatar
 router.post('/me/avatar', avatarUpload.single('avatar'), async (req: AuthRequest, res: Response) => {
   try {
-    const user = await userRepository.findOne({ where: { id: req.user!.id } });
-    if (!user) return res.status(404).json({ error: 'Usuario nao encontrado' });
-
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    user.avatar = `/uploads/${req.file.filename}`;
-    await userRepository.save(user);
-    res.json({ avatar: user.avatar });
+    const avatar = `/uploads/${req.file.filename}`;
+    await supabase.from('users').update({ avatar }).eq('id', req.user!.id);
+
+    res.json({ avatar });
   } catch (error) {
     console.error('Upload avatar error:', error);
     res.status(500).json({ error: 'Erro ao enviar avatar' });
@@ -122,48 +141,55 @@ router.post('/me/avatar', avatarUpload.single('avatar'), async (req: AuthRequest
 // GET /api/users
 router.get('/', requireRoles('ADMIN', 'COORDENADOR'), async (_req, res: Response) => {
   try {
-    const users = await userRepository.find({
-      where: { ativo: true },
-      order: { nome: 'ASC' },
-    });
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('ativo', true)
+      .order('nome', { ascending: true });
 
-    res.json(users.map((u) => u.toJSON()));
+    if (error) throw error;
+    res.json(sanitizeUsers(users.map(toCamel)));
   } catch (error) {
     console.error('List users error:', error);
-    res.status(500).json({ error: 'Erro ao listar usuários' });
+    res.status(500).json({ error: 'Erro ao listar usuarios' });
   }
 });
 
 // GET /api/users/tecnicos
 router.get('/tecnicos', async (_req, res: Response) => {
   try {
-    const tecnicos = await userRepository.find({
-      where: { role: 'TECNICO', ativo: true },
-      order: { nome: 'ASC' },
-    });
+    const { data: tecnicos, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'TECNICO')
+      .eq('ativo', true)
+      .order('nome', { ascending: true });
 
-    res.json(tecnicos.map((u) => u.toJSON()));
+    if (error) throw error;
+    res.json(sanitizeUsers(tecnicos.map(toCamel)));
   } catch (error) {
     console.error('List tecnicos error:', error);
-    res.status(500).json({ error: 'Erro ao listar técnicos' });
+    res.status(500).json({ error: 'Erro ao listar tecnicos' });
   }
 });
 
 // GET /api/users/:id
 router.get('/:id', requireRoles('ADMIN', 'COORDENADOR'), async (req, res: Response) => {
   try {
-    const user = await userRepository.findOne({
-      where: { id: req.params.id },
-    });
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
 
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
+    if (error || !user) {
+      return res.status(404).json({ error: 'Usuario nao encontrado' });
     }
 
-    res.json(user.toJSON());
+    res.json(sanitizeUser(toCamel(user)));
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({ error: 'Erro ao buscar usuário' });
+    res.status(500).json({ error: 'Erro ao buscar usuario' });
   }
 });
 
@@ -173,92 +199,109 @@ router.post('/', requireRoles('ADMIN'), async (req, res: Response) => {
     const { nome, email, senha, role } = req.body;
 
     if (!nome || !email || !senha || !role) {
-      return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+      return res.status(400).json({ error: 'Todos os campos sao obrigatorios' });
     }
 
-    const existingUser = await userRepository.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email já cadastrado' });
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (existing) {
+      return res.status(400).json({ error: 'Email ja cadastrado' });
     }
 
     const senhaHash = await bcrypt.hash(senha, 10);
 
-    const user = userRepository.create({
-      nome,
-      email,
-      senha: senhaHash,
-      role,
-      ativo: true,
-    });
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert({ nome, email, senha: senhaHash, role, ativo: true })
+      .select()
+      .single();
 
-    await userRepository.save(user);
-
-    res.status(201).json(user.toJSON());
+    if (error) throw error;
+    res.status(201).json(sanitizeUser(toCamel(user)));
   } catch (error) {
     console.error('Create user error:', error);
-    res.status(500).json({ error: 'Erro ao criar usuário' });
+    res.status(500).json({ error: 'Erro ao criar usuario' });
   }
 });
 
 // PUT /api/users/:id
 router.put('/:id', requireRoles('ADMIN'), async (req, res: Response) => {
   try {
-    const user = await userRepository.findOne({
-      where: { id: req.params.id },
-    });
+    const { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
 
     if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
+      return res.status(404).json({ error: 'Usuario nao encontrado' });
     }
 
     const { nome, email, senha, role, ativo } = req.body;
+    const updates: any = {};
 
     if (email && email !== user.email) {
-      const existingUser = await userRepository.findOne({ where: { email } });
-      if (existingUser) {
-        return res.status(400).json({ error: 'Email já cadastrado' });
+      const { data: existing } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (existing) {
+        return res.status(400).json({ error: 'Email ja cadastrado' });
       }
-      user.email = email;
+      updates.email = email;
     }
 
-    if (nome) user.nome = nome;
-    if (role) user.role = role;
-    if (typeof ativo === 'boolean') user.ativo = ativo;
+    if (nome) updates.nome = nome;
+    if (role) updates.role = role;
+    if (typeof ativo === 'boolean') updates.ativo = ativo;
     if (senha) {
-      user.senha = await bcrypt.hash(senha, 10);
+      updates.senha = await bcrypt.hash(senha, 10);
     }
 
-    await userRepository.save(user);
+    const { data: updated, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single();
 
-    res.json(user.toJSON());
+    if (error) throw error;
+    res.json(sanitizeUser(toCamel(updated)));
   } catch (error) {
     console.error('Update user error:', error);
-    res.status(500).json({ error: 'Erro ao atualizar usuário' });
+    res.status(500).json({ error: 'Erro ao atualizar usuario' });
   }
 });
 
 // DELETE /api/users/:id (soft delete)
 router.delete('/:id', requireRoles('ADMIN'), async (req: AuthRequest, res: Response) => {
   try {
-    const user = await userRepository.findOne({
-      where: { id: req.params.id },
-    });
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', req.params.id)
+      .single();
 
     if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
+      return res.status(404).json({ error: 'Usuario nao encontrado' });
     }
 
     if (user.id === req.user?.id) {
-      return res.status(400).json({ error: 'Não é possível desativar o próprio usuário' });
+      return res.status(400).json({ error: 'Nao e possivel desativar o proprio usuario' });
     }
 
-    user.ativo = false;
-    await userRepository.save(user);
+    await supabase.from('users').update({ ativo: false }).eq('id', req.params.id);
 
-    res.json({ message: 'Usuário desativado com sucesso' });
+    res.json({ message: 'Usuario desativado com sucesso' });
   } catch (error) {
     console.error('Delete user error:', error);
-    res.status(500).json({ error: 'Erro ao desativar usuário' });
+    res.status(500).json({ error: 'Erro ao desativar usuario' });
   }
 });
 
