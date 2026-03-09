@@ -6,11 +6,8 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
-  Timer,
   ArrowRight,
   Plus,
-  TrendingUp,
-  Award,
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Building2, Search, ExternalLink } from 'lucide-react'
+import { Building2, Search } from 'lucide-react'
 import { empreendimentosService } from '@/services/empreendimentos.service'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
