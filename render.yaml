@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: crm-pos-obra
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    branch: main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3333"
+      - key: JWT_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: GIO_SUPABASE_URL
+        sync: false
+      - key: GIO_SUPABASE_ANON_KEY
+        sync: false
