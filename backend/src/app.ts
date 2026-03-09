@@ -32,7 +32,12 @@ const PORT = process.env.PORT || 3333;
 // Middlewares
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173'],
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://crm-pos-obra-frontend.vercel.app',
+    process.env.FRONTEND_URL,
+  ].filter(Boolean) as string[],
   credentials: true,
   exposedHeaders: ['X-Total-Count'],
 }));

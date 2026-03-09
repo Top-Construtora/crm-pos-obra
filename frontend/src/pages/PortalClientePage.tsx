@@ -232,7 +232,7 @@ export default function PortalClientePage() {
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {(errorRastrear as any)?.response?.data?.error || 'Erro ao buscar chamado'}
+                      {String((errorRastrear as any)?.response?.data?.error || 'Erro ao buscar chamado')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -272,7 +272,7 @@ export default function PortalClientePage() {
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {(errorMeus as any)?.response?.data?.error || 'Erro ao buscar chamados'}
+                      {String((errorMeus as any)?.response?.data?.error || 'Erro ao buscar chamados')}
                     </AlertDescription>
                   </Alert>
                 )}

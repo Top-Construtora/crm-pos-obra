@@ -45,7 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.success(`Bem-vindo, ${response.user.nome}!`)
       navigate('/')
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Erro ao fazer login'
+      const rawError = error.response?.data?.error
+      const message = typeof rawError === 'string' ? rawError : 'Erro ao fazer login'
       toast.error(message)
       throw error
     }
