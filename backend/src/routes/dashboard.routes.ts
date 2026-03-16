@@ -486,9 +486,15 @@ router.get('/taxa-primeira-vez', async (req: AuthRequest, res: Response) => {
 
     let primeiraVez = 0;
     (chamados || []).forEach((chamado: any) => {
-      const temAguardando = chamado.historico?.some(
-        (h: any) => h.tipo === 'STATUS' && h.dados_novos?.includes('AGUARDANDO')
-      );
+      const temAguardando = chamado.historico?.some((h: any) => {
+        if (h.tipo !== 'STATUS') return false;
+        try {
+          const dados = typeof h.dados_novos === 'string' ? JSON.parse(h.dados_novos) : h.dados_novos;
+          return dados?.status === 'AGUARDANDO';
+        } catch {
+          return false;
+        }
+      });
       if (!temAguardando) primeiraVez++;
     });
 

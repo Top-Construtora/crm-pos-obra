@@ -119,8 +119,17 @@ export default function TecnicosPage() {
       toast.error('Preencha nome e email')
       return
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Email invalido')
+      return
+    }
     if (!editingId && !formData.senha) {
       toast.error('Senha e obrigatoria para novos usuarios')
+      return
+    }
+    if (formData.senha && formData.senha.length < 6) {
+      toast.error('Senha deve ter no minimo 6 caracteres')
       return
     }
 

@@ -8,9 +8,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'assistencia-tecnica-secret-key';
 let io: SocketServer | null = null;
 
 export function initSocket(server: HttpServer): SocketServer {
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://crm-pos-obra-frontend.vercel.app',
+    process.env.FRONTEND_URL,
+  ].filter(Boolean) as string[];
+
   io = new SocketServer(server, {
     cors: {
-      origin: ['http://localhost:3000', 'http://localhost:5173'],
+      origin: allowedOrigins,
       credentials: true,
     },
   });

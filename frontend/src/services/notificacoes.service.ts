@@ -19,4 +19,12 @@ export const notificacoesService = {
   async markAllAsRead(): Promise<void> {
     await api.patch('/notificacoes/marcar-todas-lidas')
   },
+
+  async delete(id: string): Promise<void> {
+    await api.delete(`/notificacoes/${id}`)
+  },
+
+  async deleteAll(): Promise<void> {
+    await api.delete('/notificacoes/todas')
+  },
 }

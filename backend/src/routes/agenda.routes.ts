@@ -101,6 +101,42 @@ router.get('/calendario/:ano/:mes', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/agenda/roteirizar
+router.post('/roteirizar', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { tecnicoId, data } = req.body;
+
+    if (!tecnicoId || !data) {
+      return res.status(400).json({ error: 'Campos obrigatorios: tecnicoId, data' });
+    }
+
+    const { data: agendamentos, error } = await supabase
+      .from('agenda_tecnica')
+      .select('id')
+      .eq('tecnico_id', tecnicoId)
+      .eq('data_agendamento', data)
+      .order('hora_inicio', { ascending: true });
+
+    if (error) throw error;
+
+    if (!agendamentos || agendamentos.length === 0) {
+      return res.json({ message: 'Nenhum agendamento encontrado para roteirizar' });
+    }
+
+    for (let i = 0; i < agendamentos.length; i++) {
+      await supabase
+        .from('agenda_tecnica')
+        .update({ ordem_roteiro: i + 1 })
+        .eq('id', agendamentos[i].id);
+    }
+
+    res.json({ message: 'Roteiro otimizado com sucesso', total: agendamentos.length });
+  } catch (error) {
+    console.error('Roteirizar error:', error);
+    res.status(500).json({ error: 'Erro ao roteirizar agendamentos' });
+  }
+});
+
 // GET /api/agenda/:id
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -248,42 +284,6 @@ router.delete('/:id', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequ
   } catch (error) {
     console.error('Delete agenda error:', error);
     res.status(500).json({ error: 'Erro ao remover agendamento' });
-  }
-});
-
-// POST /api/agenda/roteirizar
-router.post('/roteirizar', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, res: Response) => {
-  try {
-    const { tecnicoId, data } = req.body;
-
-    if (!tecnicoId || !data) {
-      return res.status(400).json({ error: 'Campos obrigatorios: tecnicoId, data' });
-    }
-
-    const { data: agendamentos, error } = await supabase
-      .from('agenda_tecnica')
-      .select('id')
-      .eq('tecnico_id', tecnicoId)
-      .eq('data_agendamento', data)
-      .order('hora_inicio', { ascending: true });
-
-    if (error) throw error;
-
-    if (!agendamentos || agendamentos.length === 0) {
-      return res.json({ message: 'Nenhum agendamento encontrado para roteirizar' });
-    }
-
-    for (let i = 0; i < agendamentos.length; i++) {
-      await supabase
-        .from('agenda_tecnica')
-        .update({ ordem_roteiro: i + 1 })
-        .eq('id', agendamentos[i].id);
-    }
-
-    res.json({ message: 'Roteiro otimizado com sucesso', total: agendamentos.length });
-  } catch (error) {
-    console.error('Roteirizar error:', error);
-    res.status(500).json({ error: 'Erro ao roteirizar agendamentos' });
   }
 });
 

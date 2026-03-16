@@ -320,9 +320,39 @@ export function DashboardLayout() {
                     {user?.role ? ROLE_LABELS[user.role] : ''}
                   </p>
                 </div>
-                <button className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors">
-                  <MoreVertical className="h-4 w-4" />
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors">
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" side="top" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link to="/perfil">
+                        <UserCircle className="mr-2 h-4 w-4" />
+                        Meu Perfil
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={toggleTheme}>
+                      {theme === 'light' ? (
+                        <>
+                          <Moon className="mr-2 h-4 w-4" />
+                          Modo Escuro
+                        </>
+                      ) : (
+                        <>
+                          <Sun className="mr-2 h-4 w-4" />
+                          Modo Claro
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sair
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </div>

@@ -615,7 +615,6 @@ export default function AssistenciaTecnicaPage() {
           iconClass=""
           value={stats?.total || 0}
           label="Total de Chamados"
-          trend={{ value: '12% este mes', up: true }}
           highlight
         />
         <StatCard

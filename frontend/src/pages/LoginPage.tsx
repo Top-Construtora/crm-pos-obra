@@ -196,26 +196,28 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Test Users */}
-              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
-                  Usuarios de teste:
-                </p>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 dark:text-gray-400">Admin:</span>
-                    <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">admin@empresa.com / admin123</code>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 dark:text-gray-400">Coordenador:</span>
-                    <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">coord@empresa.com / coord123</code>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 dark:text-gray-400">Tecnico:</span>
-                    <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">joao@empresa.com / tecnico123</code>
+              {/* Test Users - only in development */}
+              {import.meta.env.DEV && (
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+                    Usuarios de teste:
+                  </p>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 dark:text-gray-400">Admin:</span>
+                      <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">admin@empresa.com / admin123</code>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 dark:text-gray-400">Coordenador:</span>
+                      <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">coord@empresa.com / coord123</code>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 dark:text-gray-400">Tecnico:</span>
+                      <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">joao@empresa.com / tecnico123</code>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Footer */}
               <div className="text-center pt-4 border-t border-gray-100 dark:border-gray-700">

@@ -41,6 +41,22 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   ChamadoInput,
   CATEGORIA_LABELS,
   PRIORIDADE_LABELS,
@@ -84,6 +100,7 @@ type TabType = 'detalhes' | 'vistoria' | 'materiais' | 'historico' | 'anexos'
 
 export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: ChamadoModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('detalhes')
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const queryClient = useQueryClient()
   const isEditing = !!chamadoId
 
@@ -181,6 +198,51 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
     onError: () => toast.error('Erro ao atualizar chamado'),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => chamadosService.delete(chamadoId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chamados'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success('Chamado excluido com sucesso!')
+      onOpenChange(false)
+      onSuccess?.()
+    },
+    onError: () => toast.error('Erro ao excluir chamado'),
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: (status: string) => chamadosService.updateStatus(chamadoId!, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chamados'] })
+      queryClient.invalidateQueries({ queryKey: ['chamado', chamadoId] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success('Status atualizado!')
+    },
+    onError: () => toast.error('Erro ao atualizar status'),
+  })
+
+  const handleDuplicate = () => {
+    if (!chamado) return
+    reset({
+      empreendimentoId: chamado.empreendimentoId,
+      unidade: chamado.unidade,
+      clienteNome: chamado.clienteNome,
+      clienteTelefone: chamado.clienteTelefone,
+      clienteEmail: chamado.clienteEmail || '',
+      tipo: chamado.tipo,
+      categoria: chamado.categoria,
+      descricao: chamado.descricao,
+      prioridade: chamado.prioridade,
+      slaHoras: chamado.slaHoras,
+      responsavelId: chamado.responsavelId || undefined,
+    })
+    onOpenChange(false)
+    setTimeout(() => {
+      onOpenChange(true)
+    }, 100)
+    toast.info('Dados copiados para novo chamado')
+  }
+
   const onSubmit = (data: ChamadoForm) => {
     const payload = {
       ...data,
@@ -251,14 +313,31 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
           </div>
           <div className="flex items-center gap-3">
             {isEditing && chamado && (
-              <button className={cn(
-                'px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2',
-                getStatusBgColor(chamado.status)
-              )}>
-                <span className="w-2 h-2 rounded-full bg-white" />
-                {STATUS_LABELS[chamado.status]}
-                <ChevronDown className="h-4 w-4" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2',
+                    getStatusBgColor(chamado.status)
+                  )}>
+                    <span className="w-2 h-2 rounded-full bg-white" />
+                    {STATUS_LABELS[chamado.status]}
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(Object.keys(STATUS_LABELS) as ChamadoStatus[])
+                    .filter((s) => s !== chamado.status)
+                    .map((s) => (
+                      <DropdownMenuItem
+                        key={s}
+                        onClick={() => statusMutation.mutate(s)}
+                      >
+                        <span className={cn('w-2 h-2 rounded-full mr-2', getStatusBgColor(s))} />
+                        {STATUS_LABELS[s]}
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             <button
               onClick={() => onOpenChange(false)}
@@ -610,11 +689,21 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
             <div className="flex gap-2">
               {isEditing && (
                 <>
-                  <Button type="button" variant="ghost" className="text-muted-foreground hover:text-destructive">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Excluir
                   </Button>
-                  <Button type="button" variant="ghost" className="text-muted-foreground">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={handleDuplicate}
+                  >
                     <Copy className="h-4 w-4 mr-2" />
                     Duplicar
                   </Button>
@@ -647,6 +736,27 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
           </div>
         </form>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir chamado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acao nao pode ser desfeita. O chamado #{chamado?.numero} e todos os dados relacionados serao removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

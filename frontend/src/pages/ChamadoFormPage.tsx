@@ -50,7 +50,7 @@ const chamadoSchema = z.object({
   clienteTelefone: z
     .string()
     .min(1, 'Informe o telefone do cliente')
-    .regex(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Formato invalido. Use: (00) 00000-0000'),
+    .regex(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, 'Formato invalido. Use: (00) 0000-0000 ou (00) 00000-0000'),
   clienteEmail: z
     .string()
     .email('Formato de email invalido')

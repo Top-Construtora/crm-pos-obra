@@ -45,7 +45,9 @@ export async function criarNotificacao(params: {
   }
 
   // Send email notification (async, non-blocking)
-  sendEmailForNotification(params.usuarioId, params.tipo, emailData).catch(() => {});
+  sendEmailForNotification(params.usuarioId, params.tipo, emailData).catch((err) => {
+    console.error('[Notificacao] Erro ao enviar email:', err);
+  });
 
   return notificacao;
 }
