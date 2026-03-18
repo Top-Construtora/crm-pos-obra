@@ -9,11 +9,11 @@ export function exportChamadosListPDF(chamados: Chamado[]) {
   const doc = new jsPDF('landscape')
 
   doc.setFontSize(18)
-  doc.text('Relatorio de Chamados - CRM POS-OBRA', 14, 20)
+  doc.text('Relatório de Chamados - CRM POS-OBRA', 14, 20)
 
   doc.setFontSize(10)
   doc.setTextColor(128)
-  doc.text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}`, 14, 28)
+  doc.text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 14, 28)
   doc.text(`Total: ${chamados.length} chamados`, 14, 34)
 
   const tableData = chamados.map((c) => [
@@ -24,13 +24,13 @@ export function exportChamadosListPDF(chamados: Chamado[]) {
     CATEGORIA_LABELS[c.categoria],
     PRIORIDADE_LABELS[c.prioridade],
     STATUS_LABELS[c.status],
-    c.responsavel?.nome || 'Nao atribuido',
+    c.responsavel?.nome || 'Não atribuído',
     format(new Date(c.criadoEm), 'dd/MM/yyyy'),
   ])
 
   autoTable(doc, {
     startY: 40,
-    head: [['#', 'Cliente', 'Empreendimento', 'Unidade', 'Categoria', 'Prioridade', 'Status', 'Responsavel', 'Abertura']],
+    head: [['#', 'Cliente', 'Empreendimento', 'Unidade', 'Categoria', 'Prioridade', 'Status', 'Responsável', 'Abertura']],
     body: tableData,
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [18, 176, 160], textColor: 255, fontStyle: 'bold' },
@@ -50,7 +50,7 @@ export function exportChamadoDetailPDF(chamado: Chamado) {
   doc.setFontSize(10)
   doc.setTextColor(128)
   doc.text(`Empreendimento: ${chamado.empreendimento?.nome || '-'}`, 14, 28)
-  doc.text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}`, 14, 34)
+  doc.text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 14, 34)
 
   doc.setDrawColor(18, 176, 160)
   doc.setLineWidth(0.5)
@@ -93,8 +93,8 @@ export function exportChamadoDetailPDF(chamado: Chamado) {
     `Categoria: ${CATEGORIA_LABELS[chamado.categoria]}`,
     `Prioridade: ${PRIORIDADE_LABELS[chamado.prioridade]}`,
     `SLA: ${chamado.slaHoras}h`,
-    `Responsavel: ${chamado.responsavel?.nome || 'Nao atribuido'}`,
-    `Abertura: ${format(new Date(chamado.criadoEm), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })}`,
+    `Responsável: ${chamado.responsavel?.nome || 'Não atribuído'}`,
+    `Abertura: ${format(new Date(chamado.criadoEm), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
   ]
   chamadoInfo.forEach((line) => {
     doc.text(line, 14, y)
@@ -202,7 +202,7 @@ export function exportChamadosExcel(chamados: Chamado[]) {
     'Prioridade': PRIORIDADE_LABELS[c.prioridade],
     'Status': STATUS_LABELS[c.status],
     'SLA (h)': c.slaHoras,
-    'Responsavel': c.responsavel?.nome || '',
+    'Responsável': c.responsavel?.nome || '',
     'Criado por': c.criadoPor?.nome || '',
     'Data Abertura': format(new Date(c.criadoEm), 'dd/MM/yyyy HH:mm'),
     'Ultima Atualizacao': format(new Date(c.atualizadoEm), 'dd/MM/yyyy HH:mm'),

@@ -177,7 +177,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-muted-foreground">
-            Visao geral dos chamados de assistencia tecnica
+            Visão geral dos chamados de assistência técnica
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -461,7 +461,7 @@ export default function DashboardPage() {
                     <th className="text-center py-3 px-2 font-semibold text-muted-foreground text-xs">Finalizados</th>
                     <th className="text-center py-3 px-2 font-semibold text-muted-foreground text-xs">Em Aberto</th>
                     <th className="text-center py-3 px-2 font-semibold text-muted-foreground text-xs">Tempo Medio</th>
-                    <th className="text-center py-3 px-2 font-semibold text-muted-foreground text-xs">Taxa Resolucao</th>
+                    <th className="text-center py-3 px-2 font-semibold text-muted-foreground text-xs">Taxa Resolução</th>
                   </tr>
                 </thead>
                 <tbody>

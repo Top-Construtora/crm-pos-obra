@@ -99,7 +99,7 @@ export function DashboardLayout() {
     {
       label: 'Sistema',
       items: [
-        { name: 'Configuracoes', href: '/configuracoes', icon: Settings, adminOnly: true },
+        { name: 'Configurações', href: '/configuracoes', icon: Settings, adminOnly: true },
       ],
     },
   ]

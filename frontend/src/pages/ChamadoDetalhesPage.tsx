@@ -70,9 +70,9 @@ export default function ChamadoDetalhesPage() {
       chamadosService.update(id!, { responsavelId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chamado', id] })
-      toast.success('Responsavel atualizado')
+      toast.success('Responsável atualizado')
     },
-    onError: () => toast.error('Erro ao atualizar responsavel'),
+    onError: () => toast.error('Erro ao atualizar responsável'),
   })
 
   const addComentarioMutation = useMutation({
@@ -126,7 +126,7 @@ export default function ChamadoDetalhesPage() {
   if (!chamado) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Chamado nao encontrado</p>
+        <p className="text-muted-foreground">Chamado não encontrado</p>
         <Button className="mt-4" onClick={() => navigate('/chamados')}>
           Voltar
         </Button>
@@ -171,19 +171,19 @@ export default function ChamadoDetalhesPage() {
           {/* Descricao */}
           <Card>
             <CardHeader>
-              <CardTitle>Descricao</CardTitle>
+              <CardTitle>Descrição</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="whitespace-pre-wrap">{chamado.descricao}</p>
             </CardContent>
           </Card>
 
-          {/* Timeline / Historico */}
+          {/* Timeline / Histórico */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5" />
-                Historico
+                Histórico
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -329,7 +329,7 @@ export default function ChamadoDetalhesPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Responsavel
+                Responsável
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -344,7 +344,7 @@ export default function ChamadoDetalhesPage() {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Nao atribuido</SelectItem>
+                    <SelectItem value="none">Não atribuído</SelectItem>
                     {tecnicos?.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.nome}
@@ -354,7 +354,7 @@ export default function ChamadoDetalhesPage() {
                 </Select>
               ) : (
                 <p className="text-sm">
-                  {chamado.responsavel?.nome || 'Nao atribuido'}
+                  {chamado.responsavel?.nome || 'Não atribuído'}
                 </p>
               )}
             </CardContent>

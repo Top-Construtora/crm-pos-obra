@@ -29,7 +29,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       sessionStorage.removeItem('token')
-      window.location.href = '/login'
+      // Dispara evento para o AuthContext deslogar via React Router
+      window.dispatchEvent(new Event('auth:logout'))
     }
     return Promise.reject(error)
   }

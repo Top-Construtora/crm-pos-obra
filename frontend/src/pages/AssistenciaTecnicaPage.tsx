@@ -242,7 +242,7 @@ function KanbanCard({ chamado, isDragging, onClick }: KanbanCardProps) {
           ) : chamado.status === 'FINALIZADO' ? (
             <span className="text-[11px] font-semibold px-2.5 py-1 rounded flex items-center gap-1.5 sla-ok">
               <CheckCircle className="h-3 w-3" />
-              Concluido
+              Concluído
             </span>
           ) : (
             <span />
@@ -345,8 +345,8 @@ function ListView({ chamados }: { chamados: (Chamado & { slaInfo?: any })[] }) {
                 <th className="text-left p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">Categoria</th>
                 <th className="text-left p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">Prioridade</th>
                 <th className="text-left p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">SLA</th>
-                <th className="text-left p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">Responsavel</th>
-                <th className="text-right p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">Acoes</th>
+                <th className="text-left p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">Responsável</th>
+                <th className="text-right p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -640,7 +640,7 @@ export default function AssistenciaTecnicaPage() {
           iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
           value={stats?.finalizados || 0}
           label="Finalizados"
-          trend={{ value: `${stats?.total ? Math.round((stats.finalizados / stats.total) * 100) : 0}% resolucao`, up: true }}
+          trend={{ value: `${stats?.total ? Math.round((stats.finalizados / stats.total) * 100) : 0}% resolução`, up: true }}
         />
       </div>
 
@@ -719,7 +719,7 @@ export default function AssistenciaTecnicaPage() {
             )}
           >
             <CalendarIcon className="h-4 w-4 inline mr-2" />
-            Calendario
+            Calendário
           </button>
         </div>
 

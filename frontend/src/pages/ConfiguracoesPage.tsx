@@ -58,9 +58,9 @@ export default function ConfiguracoesPage() {
     try {
       await updateMutation.mutateAsync({ chave: 'nome_sistema', valor: nomeSistema })
       await updateMutation.mutateAsync({ chave: 'sla_padrao', valor: slaPadrao })
-      toast.success('Configuracoes gerais salvas')
+      toast.success('Configurações gerais salvas')
     } catch {
-      toast.error('Erro ao salvar configuracoes')
+      toast.error('Erro ao salvar configurações')
     }
   }
 
@@ -82,9 +82,9 @@ export default function ConfiguracoesPage() {
     setEmailHabilitado(novo)
     try {
       await updateMutation.mutateAsync({ chave: 'email_habilitado', valor: String(novo) })
-      toast.success(`Notificacoes por email ${novo ? 'habilitadas' : 'desabilitadas'}`)
+      toast.success(`Notificações por email ${novo ? 'habilitadas' : 'desabilitadas'}`)
     } catch {
-      toast.error('Erro ao atualizar configuracao de email')
+      toast.error('Erro ao atualizar configuração de email')
     }
   }
 
@@ -105,10 +105,10 @@ export default function ConfiguracoesPage() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Settings className="h-6 w-6 text-primary" />
-          Configuracoes do Sistema
+          Configurações do Sistema
         </h1>
         <p className="text-muted-foreground">
-          Gerencie as configuracoes gerais do sistema
+          Gerencie as configurações gerais do sistema
         </p>
       </div>
 
@@ -119,7 +119,7 @@ export default function ConfiguracoesPage() {
             <Clock className="h-5 w-5 text-primary" />
             Geral
           </CardTitle>
-          <CardDescription>Configuracoes gerais do sistema</CardDescription>
+          <CardDescription>Configurações gerais do sistema</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -148,7 +148,7 @@ export default function ConfiguracoesPage() {
 
           <Button onClick={handleSaveGeral} disabled={updateMutation.isPending}>
             <Save className="h-4 w-4 mr-2" />
-            Salvar Configuracoes Gerais
+            Salvar Configurações Gerais
           </Button>
         </CardContent>
       </Card>
@@ -195,7 +195,7 @@ export default function ConfiguracoesPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-primary" />
-            Notificacoes por Email
+            Notificações por Email
           </CardTitle>
           <CardDescription>Configure envio de emails automaticos</CardDescription>
         </CardHeader>
@@ -225,8 +225,8 @@ export default function ConfiguracoesPage() {
               </p>
               <p className="text-xs text-muted-foreground">
                 {emailHabilitado
-                  ? 'Notificacoes por email estao ativas. Configure SMTP no .env.'
-                  : 'Ative para enviar notificacoes por email.'}
+                  ? 'Notificações por email estão ativas. Configure SMTP no .env.'
+                  : 'Ative para enviar notificações por email.'}
               </p>
             </div>
           </button>

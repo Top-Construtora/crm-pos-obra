@@ -138,7 +138,7 @@ export function HistoricoTab({ chamadoId, chamado }: HistoricoTabProps) {
       ) : (
         <div className="text-center py-16 text-muted-foreground">
           <Clock className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">Nenhum historico disponivel</p>
+          <p className="text-sm">Nenhum histórico disponível</p>
         </div>
       )}
     </div>

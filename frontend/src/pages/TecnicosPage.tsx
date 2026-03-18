@@ -229,7 +229,7 @@ export default function TecnicosPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <User className="h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">Nenhum usuario encontrado</p>
+            <p className="mt-4 text-muted-foreground">Nenhum usuário encontrado</p>
           </CardContent>
         </Card>
       )}
@@ -300,9 +300,9 @@ export default function TecnicosPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desativar usuario?</AlertDialogTitle>
+            <AlertDialogTitle>Desativar usuário?</AlertDialogTitle>
             <AlertDialogDescription>
-              O usuario sera desativado e nao podera mais acessar o sistema.
+              O usuário será desativado e não poderá mais acessar o sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

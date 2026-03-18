@@ -52,7 +52,7 @@ export function NotificacoesDropdown() {
         <div className="absolute right-0 top-full mt-2 w-[380px] bg-card border rounded-xl shadow-xl z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-            <h3 className="font-bold text-sm">Notificacoes</h3>
+            <h3 className="font-bold text-sm">Notificações</h3>
             {unreadCount > 0 && (
               <button
                 onClick={() => markAllAsRead()}
@@ -69,7 +69,7 @@ export function NotificacoesDropdown() {
             {notificacoes.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
                 <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Nenhuma notificacao</p>
+                <p className="text-sm">Nenhuma notificação</p>
               </div>
             ) : (
               notificacoes.map((n) => (

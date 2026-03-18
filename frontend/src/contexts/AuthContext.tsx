@@ -37,6 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
+  // Escuta eventos de 401 do interceptor para deslogar via React Router
+  useEffect(() => {
+    const handleForceLogout = () => {
+      setUser(null)
+      navigate('/login')
+    }
+    window.addEventListener('auth:logout', handleForceLogout)
+    return () => window.removeEventListener('auth:logout', handleForceLogout)
+  }, [navigate])
+
   const login = async (credentials: LoginCredentials) => {
     try {
       const response: AuthResponse = await authService.login(credentials)

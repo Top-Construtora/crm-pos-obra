@@ -26,7 +26,7 @@ const passwordSchema = z.object({
   novaSenha: z.string().min(6, 'Nova senha deve ter no minimo 6 caracteres'),
   confirmarSenha: z.string().min(1, 'Confirme a nova senha'),
 }).refine((data) => data.novaSenha === data.confirmarSenha, {
-  message: 'As senhas nao conferem',
+  message: 'As senhas não conferem',
   path: ['confirmarSenha'],
 })
 

@@ -158,6 +158,18 @@
 .tag-residencial { @apply bg-muted text-foreground border border-border; }
 .tag-urgente { @apply bg-destructive text-destructive-foreground; }
 
+/* Stat highlight card */
+.stat-highlight {
+  background: linear-gradient(135deg, hsl(var(--sidebar)) 0%, hsl(var(--sidebar-accent)) 100%);
+}
+
+/* Button gradient */
+.btn-gradient {
+  background: linear-gradient(135deg, hsl(var(--sidebar)) 0%, hsl(var(--sidebar-accent)) 100%);
+  color: white;
+  border: none;
+}
+
 /* Card enhancements */
 .card-hover {
   @apply transition-colors duration-150;

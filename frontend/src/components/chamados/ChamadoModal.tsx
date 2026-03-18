@@ -280,7 +280,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
     { id: 'detalhes', label: 'Detalhes', icon: Info },
     { id: 'vistoria', label: 'Vistoria', icon: ClipboardCheck },
     { id: 'materiais', label: 'Materiais', icon: Package },
-    { id: 'historico', label: 'Historico', icon: Clock },
+    { id: 'historico', label: 'Histórico', icon: Clock },
     { id: 'anexos', label: 'Anexos', icon: Paperclip },
   ]
 
@@ -378,11 +378,11 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
               <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-6">
                 {/* Left Column */}
                 <div className="space-y-6">
-                  {/* Descricao do Problema */}
+                  {/* Descrição do Problema */}
                   <div>
                     <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
                       <FileText className="h-4 w-4 text-sidebar-accent" />
-                      Descricao do Problema
+                      Descrição do Problema
                     </h3>
                     <div className="bg-gradient-to-br from-muted/30 to-muted/10 rounded-lg p-4 border">
                       <div className="flex items-center justify-between mb-3">
@@ -424,7 +424,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                     </div>
                   </div>
 
-                  {/* Localizacao */}
+                  {/* Localização */}
                   <div>
                     <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-sidebar-accent" />
@@ -501,16 +501,16 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                     </div>
                   </div>
 
-                  {/* Responsavel Tecnico */}
+                  {/* Responsável Técnico */}
                   <div>
                     <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
                       <User className="h-4 w-4 text-sidebar-accent" />
-                      Responsavel Tecnico
+                      Responsável Técnico
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Tecnico Designado
+                          Técnico Designado
                         </label>
                         <Select
                           value={watch('responsavelId') || 'none'}
@@ -520,7 +520,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                             <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">Nao atribuido</SelectItem>
+                            <SelectItem value="none">Não atribuído</SelectItem>
                             {tecnicos?.map((tec) => (
                               <SelectItem key={tec.id} value={tec.id}>
                                 {tec.nome}
@@ -743,7 +743,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir chamado?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acao nao pode ser desfeita. O chamado #{chamado?.numero} e todos os dados relacionados serao removidos permanentemente.
+              Esta ação não pode ser desfeita. O chamado #{chamado?.numero} e todos os dados relacionados serão removidos permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

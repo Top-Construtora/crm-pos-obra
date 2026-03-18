@@ -174,7 +174,7 @@ export default function ChamadosPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar por cliente, numero, email ou descricao..."
+                placeholder="Buscar por cliente, número, email ou descrição..."
                 className="pl-9"
                 value={filters.busca || ''}
                 onChange={(e) => updateFilter('busca', e.target.value || undefined)}
@@ -235,7 +235,7 @@ export default function ChamadosPage() {
                   onValueChange={(v) => updateFilter('responsavelId', v === 'all' ? undefined : v)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Responsavel" />
+                    <SelectValue placeholder="Responsável" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -335,7 +335,7 @@ export default function ChamadosPage() {
                         })}
                       </span>
                       {chamado.responsavel && (
-                        <span>Responsavel: {chamado.responsavel.nome}</span>
+                        <span>Responsável: {chamado.responsavel.nome}</span>
                       )}
                     </div>
                   </div>
@@ -438,7 +438,7 @@ export default function ChamadosPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir chamado?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acao nao pode ser desfeita. O chamado sera permanentemente
+              Esta ação não pode ser desfeita. O chamado será permanentemente
               excluido do sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>

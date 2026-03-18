@@ -89,7 +89,7 @@ const TABS: { key: TabKey; label: string; icon: typeof ClipboardList; editOnly: 
   { key: 'dados', label: 'Dados', icon: ClipboardList, editOnly: false },
   { key: 'vistoria', label: 'Vistoria', icon: ClipboardCheck, editOnly: true },
   { key: 'materiais', label: 'Materiais', icon: Package, editOnly: true },
-  { key: 'historico', label: 'Historico', icon: Clock, editOnly: true },
+  { key: 'historico', label: 'Histórico', icon: Clock, editOnly: true },
   { key: 'anexos', label: 'Anexos', icon: Paperclip, editOnly: true },
 ]
 
@@ -209,7 +209,7 @@ export default function ChamadoFormPage() {
             {isEditing ? `Editar Chamado #${chamado?.numero}` : 'Novo Chamado'}
           </h1>
           <p className="text-muted-foreground">
-            {isEditing ? 'Atualize as informacoes do chamado' : 'Preencha os dados do novo chamado'}
+            {isEditing ? 'Atualize as informações do chamado' : 'Preencha os dados do novo chamado'}
           </p>
         </div>
       </div>
@@ -405,7 +405,7 @@ export default function ChamadoFormPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Responsavel</Label>
+                <Label>Responsável</Label>
                 <Select
                   value={watch('responsavelId') || 'none'}
                   onValueChange={(v) => setValue('responsavelId', v === 'none' ? undefined : v)}
@@ -414,7 +414,7 @@ export default function ChamadoFormPage() {
                     <SelectValue placeholder="Selecione (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Nao atribuido</SelectItem>
+                    <SelectItem value="none">Não atribuído</SelectItem>
                     {tecnicos?.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.nome}
@@ -425,7 +425,7 @@ export default function ChamadoFormPage() {
               </div>
 
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="descricao">Descricao *</Label>
+                <Label htmlFor="descricao">Descrição *</Label>
                 <Textarea
                   id="descricao"
                   {...register('descricao')}
