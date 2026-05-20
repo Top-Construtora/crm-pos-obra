@@ -12,7 +12,7 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 
 # Install pnpm and dependencies
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile
 
 # Copy backend source
 COPY backend/ ./backend/
@@ -29,7 +29,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 
-RUN corepack enable && pnpm install --frozen-lockfile --prod
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/backend/dist ./backend/dist
 
