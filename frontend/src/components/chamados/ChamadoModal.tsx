@@ -172,6 +172,23 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
     }
   }, [chamado, isEditing, reset, open])
 
+  const formatTelefone = (value: string) => {
+    const digits = (value || '').replace(/\D/g, '').slice(0, 11)
+    if (digits.length === 0) return ''
+    if (digits.length <= 2) return `(${digits}`
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+  }
+
+  const extractApiError = (err: any, fallback: string) => {
+    const apiMsg = err?.response?.data?.error || err?.response?.data?.message
+    const status = err?.response?.status
+    if (apiMsg) return status ? `${fallback}: ${apiMsg} (HTTP ${status})` : `${fallback}: ${apiMsg}`
+    if (status) return `${fallback} (HTTP ${status})`
+    return err?.message ? `${fallback}: ${err.message}` : fallback
+  }
+
   const createMutation = useMutation({
     mutationFn: chamadosService.create,
     onSuccess: () => {
@@ -181,7 +198,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
       onOpenChange(false)
       onSuccess?.()
     },
-    onError: () => toast.error('Erro ao criar chamado'),
+    onError: (err) => toast.error(extractApiError(err, 'Erro ao criar chamado')),
   })
 
   const updateMutation = useMutation({
@@ -195,7 +212,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
       onOpenChange(false)
       onSuccess?.()
     },
-    onError: () => toast.error('Erro ao atualizar chamado'),
+    onError: (err) => toast.error(extractApiError(err, 'Erro ao atualizar chamado')),
   })
 
   const deleteMutation = useMutation({
@@ -207,7 +224,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
       onOpenChange(false)
       onSuccess?.()
     },
-    onError: () => toast.error('Erro ao excluir chamado'),
+    onError: (err) => toast.error(extractApiError(err, 'Erro ao excluir chamado')),
   })
 
   const statusMutation = useMutation({
@@ -218,7 +235,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success('Status atualizado!')
     },
-    onError: () => toast.error('Erro ao atualizar status'),
+    onError: (err) => toast.error(extractApiError(err, 'Erro ao atualizar status')),
   })
 
   const handleDuplicate = () => {
@@ -586,7 +603,14 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                             <div className="font-semibold text-sm">{chamado?.clienteTelefone}</div>
                           ) : (
                             <Input
-                              {...register('clienteTelefone')}
+                              value={formatTelefone(watch('clienteTelefone') || '')}
+                              onChange={(e) =>
+                                setValue('clienteTelefone', formatTelefone(e.target.value), {
+                                  shouldValidate: true,
+                                })
+                              }
+                              inputMode="numeric"
+                              maxLength={15}
                               placeholder="(00) 00000-0000"
                               className="h-7 mt-0.5 text-sm"
                             />
