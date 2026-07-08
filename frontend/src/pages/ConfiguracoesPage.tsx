@@ -5,6 +5,7 @@ import { Settings, Save, Mail, Clock, Tag } from 'lucide-react'
 import { settingsService } from '@/services/settings.service'
 import { usePermissions } from '@/hooks/usePermissions'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -102,15 +103,11 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Settings className="h-6 w-6 text-primary" />
-          Configurações do Sistema
-        </h1>
-        <p className="text-muted-foreground">
-          Gerencie as configurações gerais do sistema
-        </p>
-      </div>
+      <PageHeader
+        icon={<Settings className="h-6 w-6" />}
+        title="Configurações do Sistema"
+        subtitle="Gerencie as configurações gerais do sistema"
+      />
 
       {/* Geral */}
       <Card>

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -119,6 +120,12 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      <PageHeader
+        icon={<UserIcon className="h-6 w-6" />}
+        title="Meu Perfil"
+        subtitle="Gerencie suas informações e segurança"
+      />
+
       {/* Avatar + Info */}
       <Card className="card-hover">
         <CardContent className="p-6">

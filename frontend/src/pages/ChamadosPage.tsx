@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Eye, Pencil, Trash2, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, Trash2, Filter, X, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import { usersService } from '@/services/users.service'
 import { usePermissions } from '@/hooks/usePermissions'
 import { ChamadoModal } from '@/components/chamados/ChamadoModal'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -131,20 +132,19 @@ export default function ChamadosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Chamados</h1>
-          <p className="text-muted-foreground">
-            {totalCount} chamados encontrados
-          </p>
-        </div>
-        {canCreateChamado() && (
-          <Button onClick={() => handleOpenModal()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Chamado
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        icon={<ClipboardList className="h-6 w-6" />}
+        title="Chamados"
+        subtitle={`${totalCount} chamados encontrados`}
+        actions={
+          canCreateChamado() ? (
+            <Button onClick={() => handleOpenModal()}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Chamado
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Filters */}
       <Card>

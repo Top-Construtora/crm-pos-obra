@@ -2,12 +2,9 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Eye, EyeOff, Loader2, Headset, Clock, Users } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { GIO_FONT } from '@/config/gioBrand'
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Informe seu email').email('Formato de email invalido'),
@@ -15,6 +12,8 @@ const loginSchema = z.object({
 })
 
 type LoginForm = z.infer<typeof loginSchema>
+
+const INVERT_TO_WHITE = 'invert(1) brightness(1.1)'
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -25,9 +24,7 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-  })
+  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true)
@@ -39,195 +36,209 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e2938] via-[#1e6076] to-[#12b0a0] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent transform -skew-y-12 scale-150"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent transform skew-y-12 scale-150"></div>
-      </div>
+    <div
+      className="relative min-h-screen w-full overflow-hidden bg-[#1A1A1A] text-white"
+      style={{ fontFamily: GIO_FONT }}
+    >
+      {/* Grade blueprint — pano de fundo técnico (lime translúcido sobre obsidian) */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          backgroundImage: `linear-gradient(rgba(210,255,0,.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(210,255,0,.05) 1px, transparent 1px),
+            linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px)`,
+          backgroundSize: '90px 90px, 90px 90px, 22.5px 22.5px, 22.5px 22.5px',
+          maskImage: 'radial-gradient(ellipse 100% 100% at 45% 45%, black 30%, transparent 100%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 100% 100% at 45% 45%, black 30%, transparent 100%)',
+        }}
+      />
 
-      <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center relative z-10">
-        {/* Left Side - Branding & Info */}
-        <div className="hidden lg:flex flex-col justify-center space-y-8 text-white">
-          <div className="space-y-6">
-            <img
-              src="/assets/logoGIO.png"
-              alt="GIO Logo"
-              className="h-16 w-auto object-contain"
-            />
-            <div>
-              <h1 className="text-5xl font-bold leading-tight mb-4">
-                Sistema de<br />
-                <span className="text-[#12b0a0]">Assistência</span><br />
-                Técnica
-              </h1>
-              <p className="text-xl text-white/80 leading-relaxed">
-                Gerencie chamados de assistência técnica com eficiência.
-                Acompanhe SLAs, atribua técnicos e mantenha seus clientes satisfeitos.
-              </p>
+      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:h-screen lg:grid-cols-[1.05fr_0.95fr]">
+        {/* ═══ ESQUERDA — PAINEL DE MARCA ═══ */}
+        <aside className="relative hidden flex-col justify-center overflow-hidden px-16 py-16 lg:flex xl:px-24">
+          <svg
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+            viewBox="0 0 780 900"
+            preserveAspectRatio="xMidYMid slice"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <g>
+              <line x1="0" y1="900" x2="420" y2="0" stroke="#D2FF00" strokeWidth="1" opacity=".08" />
+              <circle cx="420" cy="0" r="3.5" fill="#D2FF00" opacity=".2" />
+              <circle cx="0" cy="900" r="3.5" fill="#D2FF00" opacity=".2" />
+            </g>
+            <g>
+              <line x1="160" y1="900" x2="580" y2="0" stroke="#D2FF00" strokeWidth=".5" opacity=".05" />
+              <circle cx="580" cy="0" r="2" fill="#D2FF00" opacity=".12" />
+              <circle cx="160" cy="900" r="2" fill="#D2FF00" opacity=".12" />
+            </g>
+            <g>
+              <line x1="0" y1="260" x2="300" y2="260" stroke="#D2FF00" strokeWidth=".8" opacity=".12" />
+              <circle cx="300" cy="260" r="3" fill="#D2FF00" opacity=".25" />
+            </g>
+            <g>
+              <line x1="480" y1="640" x2="780" y2="640" stroke="#D2FF00" strokeWidth=".8" opacity=".12" />
+              <circle cx="480" cy="640" r="3" fill="#D2FF00" opacity=".25" />
+            </g>
+            <g>
+              <path d="M36 36 L36 96 L96 96" fill="none" stroke="#D2FF00" strokeWidth="1.4" opacity=".25" />
+              <circle cx="96" cy="96" r="3" fill="#D2FF00" opacity=".3" />
+            </g>
+            <g>
+              <path d="M36 864 L36 804 L96 804" fill="none" stroke="#D2FF00" strokeWidth="1.4" opacity=".25" />
+              <circle cx="96" cy="804" r="3" fill="#D2FF00" opacity=".3" />
+            </g>
+          </svg>
+
+          <div className="relative z-[1] max-w-[560px]">
+            <div className="mb-12">
+              <img
+                src="/assets/gioWordmark.png"
+                alt="GIO"
+                className="w-[240px] max-w-full"
+                style={{ filter: INVERT_TO_WHITE }}
+              />
+              <span className="mt-3 block text-[12px] font-medium uppercase tracking-[0.18em] text-white/35">
+                Gestão Inteligente de Obras
+              </span>
+            </div>
+
+            <div className="flex gap-[14px]">
+              <div className="mt-2 w-[3px] shrink-0 self-stretch rounded-full bg-gradient-to-b from-[#D2FF00] via-[#D2FF00]/40 to-transparent" />
+              <div>
+                <h1 className="mb-6 text-[48px] font-semibold leading-[1.08] tracking-[-0.035em] text-white">
+                  Assistência técnica sob controle,{' '}
+                  <em className="not-italic text-[#D2FF00]">do chamado à entrega</em>.
+                </h1>
+                <p className="max-w-[460px] text-[17px] leading-[1.6] text-white/55">
+                  Chamados, SLAs e equipes técnicas em um só lugar — com a visibilidade que sua
+                  operação de pós-obra precisa para resolver rápido.
+                </p>
+              </div>
             </div>
           </div>
+        </aside>
 
-          {/* Features */}
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
-              <div className="p-3 bg-[#12b0a0] rounded-xl">
-                <Headset className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Controle de Chamados</h3>
-                <p className="text-white/70 text-sm">Gerencie chamados do início ao fim</p>
-              </div>
-            </div>
+        {/* ═══ DIREITA — FORMULÁRIO ═══ */}
+        <main className="relative flex items-center justify-center p-6 lg:px-16">
+          <div className="w-[430px] max-w-[calc(100%-48px)] sm:max-w-[calc(100%-80px)]">
+            <div
+              className="relative rounded-[20px] border border-white/10 bg-[rgba(0,0,0,0.18)] px-10 pb-10 pt-11 shadow-[0_32px_64px_rgba(0,0,0,0.35)]"
+              style={{
+                backdropFilter: 'blur(28px) saturate(1.4)',
+                WebkitBackdropFilter: 'blur(28px) saturate(1.4)',
+              }}
+            >
+              {/* Barra de destaque lime */}
+              <div className="absolute -top-px left-10 right-10 h-0.5 rounded-b-[4px] bg-[#D2FF00] opacity-90" />
 
-            <div className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
-              <div className="p-3 bg-[#1e6076] rounded-xl">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Monitoramento de SLA</h3>
-                <p className="text-white/70 text-sm">Acompanhe prazos e performance em tempo real</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-sm rounded-2xl">
-              <div className="p-3 bg-[#baa673] rounded-xl">
-                <Users className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Gestão de Técnicos</h3>
-                <p className="text-white/70 text-sm">Atribua e acompanhe sua equipe técnica</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side - Login Form */}
-        <div className="flex items-center justify-center">
-          <Card className="w-full max-w-md shadow-2xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-0">
-            <CardHeader className="space-y-4 text-center pb-8">
-              <div className="p-3 bg-gradient-to-br from-[#12b0a0] to-[#1e6076] rounded-2xl w-16 h-16 mx-auto flex items-center justify-center">
+              <div className="mb-7 flex flex-col items-center gap-2.5 text-center">
                 <img
-                  src="/assets/logoGIO.png"
-                  alt="GIO Logo"
-                  className="h-10 w-auto object-contain"
+                  src="/assets/gioWordmark.png"
+                  alt="GIO"
+                  className="block h-[40px] w-auto"
+                  style={{ filter: INVERT_TO_WHITE }}
                 />
+                <span className="text-[10.5px] font-medium uppercase tracking-[0.13em] text-[#8B8B95]">
+                  Gestão Inteligente de Obras
+                </span>
               </div>
-              <div>
-                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  Bem-vindo(a)!
-                </CardTitle>
-                <CardDescription className="text-gray-600 dark:text-gray-400 mt-2">
-                  Faça login para acessar o sistema de assistência técnica
-                </CardDescription>
-              </div>
-            </CardHeader>
 
-            <CardContent className="space-y-6">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder="seu@email.com"
-                      {...register('email')}
-                      className={`mt-1 h-12 ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-[#12b0a0]'}`}
-                    />
-                    {errors.email && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        {errors.email.message}
-                      </p>
-                    )}
-                  </div>
+              <div className="mb-[26px] h-px w-full bg-white/[0.09]" />
 
-                  <div>
-                    <Label htmlFor="senha" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Senha
-                    </Label>
-                    <div className="relative mt-1">
-                      <Input
-                        id="senha"
-                        type={showPassword ? 'text' : 'password'}
-                        autoComplete="current-password"
-                        placeholder="••••••••"
-                        {...register('senha')}
-                        className={`h-12 pr-12 ${errors.senha ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-[#12b0a0]'}`}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-12 px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-400" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-400" />
-                        )}
-                      </Button>
-                    </div>
-                    {errors.senha && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                        {errors.senha.message}
-                      </p>
-                    )}
-                  </div>
+              <h2 className="mb-1.5 text-center text-[22px] font-semibold tracking-[-0.03em] text-white">
+                Bem-vindo de volta
+              </h2>
+              <p className="mb-8 text-center text-[14px] text-[#8B8B95]">
+                Acesse sua conta para continuar.
+              </p>
+
+              <form onSubmit={handleSubmit(onSubmit)}>
+                {/* E-mail */}
+                <div className="mb-4 flex flex-col gap-1.5">
+                  <label htmlFor="email" className="text-[11.5px] font-semibold uppercase tracking-[0.07em] text-[#8B8B95]">
+                    E-mail
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="seu@email.com.br"
+                    {...register('email')}
+                    className="h-12 w-full rounded-[10px] border border-white/10 bg-white/[0.06] px-4 text-[14.5px] text-white outline-none transition placeholder:text-[#8B8B95] placeholder:opacity-55 hover:border-white/[0.14] focus:border-[#D2FF00] focus:shadow-[0_0_0_3px_rgba(210,255,0,0.18)]"
+                  />
+                  {errors.email && <span className="text-[12px] text-[#ff9090]">{errors.email.message}</span>}
                 </div>
 
-                <Button
+                {/* Senha */}
+                <div className="mb-6 flex flex-col gap-1.5">
+                  <label htmlFor="senha" className="text-[11.5px] font-semibold uppercase tracking-[0.07em] text-[#8B8B95]">
+                    Senha
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="senha"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      {...register('senha')}
+                      className="h-12 w-full rounded-[10px] border border-white/10 bg-white/[0.06] pl-4 pr-12 text-[14.5px] text-white outline-none transition placeholder:text-[#8B8B95] placeholder:opacity-55 hover:border-white/[0.14] focus:border-[#D2FF00] focus:shadow-[0_0_0_3px_rgba(210,255,0,0.18)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-1 text-[#8B8B95] opacity-70 transition hover:opacity-100"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {errors.senha && <span className="text-[12px] text-[#ff9090]">{errors.senha.message}</span>}
+                </div>
+
+                {/* Entrar — CTA primário em lime */}
+                <button
                   type="submit"
-                  className="w-full h-12 bg-gradient-to-r from-[#12b0a0] to-[#1e6076] hover:from-[#0f9d8a] hover:to-[#1a5a6b] text-white font-semibold text-base shadow-lg transition-all duration-200"
                   disabled={isLoading}
+                  className="relative flex h-[50px] w-full items-center justify-center rounded-[10px] bg-[#D2FF00] text-[15px] font-bold tracking-[0.02em] text-[#1A1A1A] shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition cursor-pointer hover:-translate-y-px hover:bg-[#C2EE00] hover:shadow-[0_6px_20px_rgba(0,0,0,0.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Entrando...
-                    </>
-                  ) : (
-                    'Entrar no Sistema'
-                  )}
-                </Button>
+                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Entrar'}
+                </button>
               </form>
 
-              {/* Test Users - only in development */}
+              {/* Usuarios de teste — apenas em desenvolvimento */}
               {import.meta.env.DEV && (
-                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
-                    Usuarios de teste:
+                <div className="mt-6 rounded-[10px] border border-white/[0.08] bg-white/[0.03] p-3.5">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8B8B95]">
+                    Usuarios de teste
                   </p>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 dark:text-gray-400">Admin:</span>
-                      <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">admin@empresa.com / admin123</code>
+                  <div className="space-y-1 text-[11.5px] text-white/60">
+                    <div className="flex justify-between gap-2">
+                      <span>Admin</span>
+                      <code className="text-white/80">admin@empresa.com / admin123</code>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 dark:text-gray-400">Coordenador:</span>
-                      <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">coord@empresa.com / coord123</code>
+                    <div className="flex justify-between gap-2">
+                      <span>Coordenador</span>
+                      <code className="text-white/80">coord@empresa.com / coord123</code>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500 dark:text-gray-400">Tecnico:</span>
-                      <code className="bg-white dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">joao@empresa.com / tecnico123</code>
+                    <div className="flex justify-between gap-2">
+                      <span>Tecnico</span>
+                      <code className="text-white/80">joao@empresa.com / tecnico123</code>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Footer */}
-              <div className="text-center pt-4 border-t border-gray-100 dark:border-gray-700">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Sistema protegido por autenticação segura
-                </p>
+              <div className="mt-[26px] text-center text-[11px] tracking-[0.03em] text-[#8B8B95] opacity-55">
+                © 2026 GIO · Todos os direitos reservados
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   )

@@ -60,8 +60,9 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {
-        'soft': '0px 2px 8px rgba(0, 0, 0, 0.04)',
-        'card': '0px 1px 3px rgba(0, 0, 0, 0.05)',
+        // Sombra de card do GIO (AdminPageHeader) — duas camadas suaves.
+        'card': '0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04)',
+        'soft': '0 6px 20px rgba(0, 0, 0, 0.08)',
       },
       fontFamily: {
         sans: ['Roboto', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],

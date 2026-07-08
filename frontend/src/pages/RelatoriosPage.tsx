@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, TrendingUp, AlertTriangle, Clock, Target, PieChart } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/page-header';
 import { dashboardService } from '@/services/dashboard.service';
 import api from '@/services/api';
 import { CATEGORIA_LABELS, PRIORIDADE_LABELS } from '@/types';
@@ -55,12 +56,11 @@ export default function RelatoriosPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Relatórios e KPIs</h1>
-        <p className="text-muted-foreground">
-          Indicadores de desempenho e análises detalhadas
-        </p>
-      </div>
+      <PageHeader
+        icon={<BarChart3 className="h-6 w-6" />}
+        title="Relatórios e KPIs"
+        subtitle="Indicadores de desempenho e análises detalhadas"
+      />
 
       {/* KPIs principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
