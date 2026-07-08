@@ -314,7 +314,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
       {/* Modal */}
       <div className="relative bg-card w-[1000px] max-w-[95vw] max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b bg-gradient-to-r from-muted/50 to-muted/30 flex items-start justify-between">
+        <div className="px-6 py-5 border-b bg-card flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-primary flex items-center gap-2">
               <Ticket className="h-5 w-5 text-sidebar-accent" />
@@ -401,7 +401,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                       <FileText className="h-4 w-4 text-sidebar-accent" />
                       Descrição do Problema
                     </h3>
-                    <div className="bg-gradient-to-br from-muted/30 to-muted/10 rounded-lg p-4 border">
+                    <div className="bg-muted/40 rounded-lg p-4 border">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-sm font-semibold text-foreground">Relato do Cliente</span>
                         {(isEditing && chamado) ? (

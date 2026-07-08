@@ -174,7 +174,7 @@ export default function PortalClientePage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#f2faf9] to-[#e6f1ef] dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-4xl mx-auto space-y-6 py-8">
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Portal do Cliente</h1>

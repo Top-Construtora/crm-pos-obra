@@ -668,7 +668,7 @@ export default function AssistenciaTecnicaPage() {
         </DropdownMenu>
 
         {canCreateChamado() && (
-          <Button className="btn-gradient" onClick={() => handleOpenModal()}>
+          <Button onClick={() => handleOpenModal()}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Chamado
           </Button>
