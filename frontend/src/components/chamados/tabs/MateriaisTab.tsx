@@ -204,7 +204,7 @@ export function MateriaisTab({ chamadoId, chamado }: MateriaisTabProps) {
             </div>
             <div className="flex justify-between items-center">
               <span className="font-semibold">Total Geral</span>
-              <span className="text-xl font-bold text-primary">{formatCurrency(totalGeral)}</span>
+              <span className="text-xl font-bold text-foreground">{formatCurrency(totalGeral)}</span>
             </div>
           </div>
         )}

@@ -74,7 +74,9 @@ export function DashboardLayout() {
       <div className="flex flex-col min-w-0 h-screen bg-background">
         <AppHeader pageTitle={pageTitle} onMenuClick={() => setMobileOpen(true)} onLogout={logout} />
         <main id="main-content" className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <Outlet />
+          <div className="app-content-zoom">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

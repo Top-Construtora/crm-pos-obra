@@ -197,6 +197,14 @@
   @apply bg-background;
 }
 
+/* Zoom de conteudo (75%) apenas em telas de notebook — para caber melhor
+   (ex.: kanban). Nao afeta monitores grandes (>=1920) nem mobile/tablet. */
+@media (min-width: 1024px) and (max-width: 1680px) {
+  .app-content-zoom {
+    zoom: 0.75;
+  }
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   /* Touch-friendly buttons */

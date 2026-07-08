@@ -160,7 +160,7 @@ export default function ConfiguracoesPage() {
                 onClick={() => handleToggleCategoria(key)}
                 className={`p-3 rounded-lg border text-sm font-medium transition-all ${
                   categoriasAtivas.includes(key)
-                    ? 'bg-primary/10 border-primary text-primary'
+                    ? 'bg-primary/10 border-primary text-foreground'
                     : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted'
                 }`}
               >

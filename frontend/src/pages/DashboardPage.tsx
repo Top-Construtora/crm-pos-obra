@@ -517,7 +517,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <CardTitle className="text-base font-semibold">SLA Critico</CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary">
+            <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
               <Link to="/chamados">
                 Ver todos <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
@@ -565,7 +565,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <CardTitle className="text-base font-semibold">Chamados Recentes</CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary">
+            <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
               <Link to="/chamados">
                 Ver todos <ArrowRight className="ml-1 h-4 w-4" />
               </Link>

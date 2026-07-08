@@ -316,7 +316,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
         {/* Header */}
         <div className="px-6 py-5 border-b bg-card flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
               <Ticket className="h-5 w-5 text-sidebar-accent" />
               {isEditing ? `Protocolo #${chamado?.numero} - ${chamado?.empreendimento?.nome}` : 'Novo Chamado'}
             </h2>
