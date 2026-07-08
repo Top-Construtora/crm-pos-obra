@@ -557,7 +557,8 @@ export default function AssistenciaTecnicaPage() {
   }
 
   return (
-    <div className="space-y-0">
+    // Zoom de 75% apenas nesta pagina/conteudo, para o kanban caber por completo.
+    <div className="space-y-0" style={{ zoom: 0.75 }}>
       {/* Filters Bar */}
       <div className="flex items-center gap-3 p-4 bg-card border-b flex-wrap -mx-4 lg:-mx-6 px-4 lg:px-6">
         {/* Search */}

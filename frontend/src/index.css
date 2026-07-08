@@ -19,7 +19,7 @@
     --card-foreground: 0 0% 9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 9%;
-    --primary: 68 61% 46%;
+    --primary: 72 100% 50%;
     --primary-foreground: 0 0% 10%;
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 9%;
@@ -37,7 +37,7 @@
     --info-foreground: 0 0% 98%;
     --border: 0 0% 90%;
     --input: 0 0% 90%;
-    --ring: 68 61% 46%;
+    --ring: 72 100% 50%;
     --radius: 0.5rem;
 
     /* Sidebar colors - Dark */

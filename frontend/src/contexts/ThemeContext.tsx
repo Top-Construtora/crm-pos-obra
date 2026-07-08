@@ -5,11 +5,11 @@ export type AccentColor = 'teal' | 'blue' | 'purple' | 'orange'
 
 const ACCENT_PRESETS: Record<AccentColor, { primary: string; secondary: string; ring: string }> = {
   teal: {
-    // Identidade GIO v4.0 (gioContentTheme): lime fosco no claro (#A9BE2E),
-    // lime puro no escuro (#D2FF00) — ambos com texto escuro.
-    primary: '68 61% 46%',
+    // Lime puro do GIO (#D2FF00) — mesmo verde do shell (sidebar/avatares),
+    // sempre com texto escuro por cima.
+    primary: '72 100% 50%',
     secondary: '72 100% 50%',
-    ring: '68 61% 46%',
+    ring: '72 100% 50%',
   },
   blue: {
     primary: '217 91% 50%',
