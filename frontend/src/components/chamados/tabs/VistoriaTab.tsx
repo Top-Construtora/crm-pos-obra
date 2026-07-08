@@ -163,7 +163,7 @@ export function VistoriaTab({ chamadoId }: VistoriaTabProps) {
       <div className="flex items-center gap-2 pt-2">
         <Button
           type="button"
-          className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-white"
+          className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-[#1A1A1A]"
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
         >

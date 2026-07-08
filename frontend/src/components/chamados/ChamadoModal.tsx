@@ -750,7 +750,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
               )}
               <Button
                 type="submit"
-                className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-white"
+                className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-[#1A1A1A]"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <Check className="h-4 w-4 mr-2" />

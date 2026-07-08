@@ -239,7 +239,7 @@ function KanbanColumn({ column, chamados, onAddClick, onCardClick }: KanbanColum
     <div
       ref={setNodeRef}
       className={cn(
-        'flex flex-col min-w-[340px] max-w-[340px] bg-slate-50 dark:bg-slate-900/50 rounded-xl border max-h-full transition-all duration-200',
+        'flex flex-col min-w-[340px] max-w-[340px] bg-muted/40 dark:bg-white/[0.04] rounded-xl border max-h-full transition-all duration-200',
         isOver && 'border-primary/50 bg-primary/5 dark:bg-primary/10 ring-1 ring-primary/20'
       )}
     >

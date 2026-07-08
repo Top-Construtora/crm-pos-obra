@@ -164,7 +164,7 @@ export function MateriaisTab({ chamadoId, chamado }: MateriaisTabProps) {
                 <Button
                   type="button"
                   size="sm"
-                  className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-white"
+                  className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-[#1A1A1A]"
                   onClick={() => addMutation.mutate()}
                   disabled={!newMaterial.nome || addMutation.isPending}
                 >
@@ -243,7 +243,7 @@ export function MateriaisTab({ chamadoId, chamado }: MateriaisTabProps) {
         <Button
           type="button"
           size="sm"
-          className="mt-3 bg-sidebar-accent hover:bg-sidebar-accent/90 text-white"
+          className="mt-3 bg-sidebar-accent hover:bg-sidebar-accent/90 text-[#1A1A1A]"
           onClick={() => saveMaoDeObraMutation.mutate()}
           disabled={saveMaoDeObraMutation.isPending}
         >
