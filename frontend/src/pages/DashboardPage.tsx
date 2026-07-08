@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ArrowRight,
   Plus,
-  LayoutDashboard,
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -19,7 +18,6 @@ import { dashboardService } from '@/services/dashboard.service'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { PageHeader } from '@/components/ui/page-header'
 import { CATEGORIA_LABELS, STATUS_LABELS, PRIORIDADE_LABELS, ROLE_LABELS } from '@/types'
 import { usePermissions } from '@/hooks/usePermissions'
 import { ChamadoModal } from '@/components/chamados/ChamadoModal'
@@ -175,38 +173,31 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with period selector */}
-      <PageHeader
-        icon={<LayoutDashboard className="h-6 w-6" />}
-        title="Dashboard"
-        subtitle="Visão geral dos chamados de assistência técnica"
-        actions={
-          <>
-            <div className="flex bg-muted rounded-lg p-1">
-              {PERIODO_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setPeriodo(opt.value)}
-                  className={cn(
-                    'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
-                    periodo === opt.value
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {canCreateChamado() && (
-              <Button size="lg" onClick={() => setModalOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Chamado
-              </Button>
-            )}
-          </>
-        }
-      />
+      {/* Toolbar: período + ação */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex bg-muted rounded-lg p-1">
+          {PERIODO_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setPeriodo(opt.value)}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                periodo === opt.value
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {canCreateChamado() && (
+          <Button size="lg" onClick={() => setModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Chamado
+          </Button>
+        )}
+      </div>
 
       {/* Row 1: Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

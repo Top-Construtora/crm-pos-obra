@@ -5,9 +5,11 @@ export type AccentColor = 'teal' | 'blue' | 'purple' | 'orange'
 
 const ACCENT_PRESETS: Record<AccentColor, { primary: string; secondary: string; ring: string }> = {
   teal: {
-    primary: '193 60% 29%',
-    secondary: '174 82% 38%',
-    ring: '193 60% 29%',
+    // Identidade GIO v4.0 (gioContentTheme): lime fosco no claro (#A9BE2E),
+    // lime puro no escuro (#D2FF00) — ambos com texto escuro.
+    primary: '68 61% 46%',
+    secondary: '72 100% 50%',
+    ring: '68 61% 46%',
   },
   blue: {
     primary: '217 91% 50%',
@@ -63,9 +65,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const preset = ACCENT_PRESETS[accentColor]
     root.style.setProperty('--primary', preset.primary)
     root.style.setProperty('--ring', preset.ring)
-    root.style.setProperty('--accent', preset.secondary)
+    // --accent fica com o neutro do index.css (evita hover/foco saturado)
 
-    // Update dark mode primary too
+    // No escuro, o primario usa o lime puro (#D2FF00)
     if (theme === 'dark') {
       root.style.setProperty('--primary', preset.secondary)
     }

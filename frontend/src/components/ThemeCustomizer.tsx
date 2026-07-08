@@ -4,14 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 const COLOR_LABELS: Record<AccentColor, string> = {
-  teal: 'Teal',
+  teal: 'GIO',
   blue: 'Azul',
   purple: 'Roxo',
   orange: 'Laranja',
 }
 
 const COLOR_HEX: Record<AccentColor, string> = {
-  teal: '#12b0a0',
+  teal: '#A9BE2E',
   blue: '#2563eb',
   purple: '#8b5cf6',
   orange: '#f97316',

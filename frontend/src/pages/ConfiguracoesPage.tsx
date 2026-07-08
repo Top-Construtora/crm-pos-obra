@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Settings, Save, Mail, Clock, Tag } from 'lucide-react'
+import { Save, Mail, Clock, Tag } from 'lucide-react'
 import { settingsService } from '@/services/settings.service'
 import { usePermissions } from '@/hooks/usePermissions'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -103,12 +102,6 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={<Settings className="h-6 w-6" />}
-        title="Configurações do Sistema"
-        subtitle="Gerencie as configurações gerais do sistema"
-      />
-
       {/* Geral */}
       <Card>
         <CardHeader>

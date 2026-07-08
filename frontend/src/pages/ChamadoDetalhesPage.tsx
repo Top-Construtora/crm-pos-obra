@@ -20,7 +20,6 @@ import { chamadosService } from '@/services/chamados.service'
 import { usersService } from '@/services/users.service'
 import { usePermissions } from '@/hooks/usePermissions'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
@@ -34,9 +33,7 @@ import {
 } from '@/components/ui/select'
 import {
   STATUS_LABELS,
-  CATEGORIA_LABELS,
   PRIORIDADE_LABELS,
-  TIPO_LABELS,
 } from '@/types'
 
 export default function ChamadoDetalhesPage() {
@@ -137,33 +134,25 @@ export default function ChamadoDetalhesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <PageHeader
-        leading={
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-        }
-        title={
-          <span className="flex items-center gap-2">
-            Chamado #{chamado.numero}
-            <Badge variant={getPrioridadeColor(chamado.prioridade)}>
-              {PRIORIDADE_LABELS[chamado.prioridade as keyof typeof PRIORIDADE_LABELS]}
-            </Badge>
-          </span>
-        }
-        subtitle={`${CATEGORIA_LABELS[chamado.categoria as keyof typeof CATEGORIA_LABELS]} - ${TIPO_LABELS[chamado.tipo as keyof typeof TIPO_LABELS]}`}
-        actions={
-          canEditChamado() ? (
-            <Button asChild>
-              <Link to={`/chamados/${id}/editar`}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Editar
-              </Link>
-            </Button>
-          ) : undefined
-        }
-      />
+          <Badge variant={getPrioridadeColor(chamado.prioridade)}>
+            {PRIORIDADE_LABELS[chamado.prioridade as keyof typeof PRIORIDADE_LABELS]}
+          </Badge>
+        </div>
+        {canEditChamado() && (
+          <Button asChild>
+            <Link to={`/chamados/${id}/editar`}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Link>
+          </Button>
+        )}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}

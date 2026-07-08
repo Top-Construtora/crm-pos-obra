@@ -23,7 +23,6 @@ import { toast } from 'sonner'
 import {
   Search,
   Eye,
-  Wrench,
   LayoutGrid,
   List,
   Calendar as CalendarIcon,
@@ -44,7 +43,6 @@ import { chamadosService } from '@/services/chamados.service'
 import { empreendimentosService } from '@/services/empreendimentos.service'
 import { exportChamadosListPDF, exportChamadosExcel } from '@/lib/export'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -560,15 +558,6 @@ export default function AssistenciaTecnicaPage() {
 
   return (
     <div className="space-y-0">
-      {/* Header */}
-      <div className="mb-6">
-        <PageHeader
-          icon={<Wrench className="h-6 w-6" />}
-          title="Assistência Técnica"
-          subtitle="Acompanhe e gerencie os chamados de assistência técnica"
-        />
-      </div>
-
       {/* Filters Bar */}
       <div className="flex items-center gap-3 p-4 bg-card border-b flex-wrap -mx-4 lg:-mx-6 px-4 lg:px-6">
         {/* Search */}

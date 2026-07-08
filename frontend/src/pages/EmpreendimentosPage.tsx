@@ -4,7 +4,6 @@ import { Building2, Search } from 'lucide-react'
 import { empreendimentosService } from '@/services/empreendimentos.service'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { PageHeader } from '@/components/ui/page-header'
 
 export default function EmpreendimentosPage() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -27,13 +26,6 @@ export default function EmpreendimentosPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <PageHeader
-        icon={<Building2 className="h-6 w-6" />}
-        title="Empreendimentos"
-        subtitle="Gerencie os empreendimentos cadastrados"
-      />
-
       {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

@@ -6,15 +6,19 @@ import { login, CREDENCIAIS } from './helpers';
  * toda tela renderiza para qualquer usuario logado — o que muda por perfil e a
  * visibilidade no menu e os botoes de acao (validados separadamente abaixo).
  */
+// O titulo da pagina vive no header do shell (banner); o conteudo nao repete o h1.
+const bannerHeading = (p: Page, name: string) =>
+  p.getByRole('banner').getByRole('heading', { name, level: 1 });
+
 const TELAS: { path: string; nome: string; marcador: (p: Page) => ReturnType<Page['getByRole']> | ReturnType<Page['getByText']> }[] = [
-  { path: '/', nome: 'Dashboard', marcador: (p) => p.getByRole('banner').getByRole('heading', { name: 'Dashboard', level: 1 }) },
-  { path: '/relatorios', nome: 'Relatorios', marcador: (p) => p.getByRole('main').getByRole('heading', { name: 'Relatórios e KPIs', level: 1 }) },
-  { path: '/assistencia', nome: 'Assistencia Tecnica', marcador: (p) => p.getByRole('banner').getByRole('heading', { name: 'Assistência Técnica', level: 1 }) },
-  { path: '/chamados', nome: 'Chamados', marcador: (p) => p.getByRole('main').getByRole('heading', { name: 'Chamados', level: 1 }) },
-  { path: '/chamados/novo', nome: 'Novo Chamado', marcador: (p) => p.getByRole('main').getByRole('heading', { name: 'Novo Chamado', level: 1 }) },
-  { path: '/agenda', nome: 'Agenda Tecnica', marcador: (p) => p.getByRole('main').getByRole('heading', { name: 'Agenda Técnica', level: 1 }) },
-  { path: '/empreendimentos', nome: 'Empreendimentos', marcador: (p) => p.getByRole('main').getByRole('heading', { name: 'Empreendimentos', level: 1 }) },
-  { path: '/tecnicos', nome: 'Equipe Tecnica', marcador: (p) => p.getByRole('main').getByRole('heading', { name: /Usuarios|Tecnicos/, level: 1 }) },
+  { path: '/', nome: 'Dashboard', marcador: (p) => bannerHeading(p, 'Dashboard') },
+  { path: '/relatorios', nome: 'Relatorios', marcador: (p) => bannerHeading(p, 'Relatórios') },
+  { path: '/assistencia', nome: 'Assistencia Tecnica', marcador: (p) => bannerHeading(p, 'Assistência Técnica') },
+  { path: '/chamados', nome: 'Chamados', marcador: (p) => bannerHeading(p, 'Chamados') },
+  { path: '/chamados/novo', nome: 'Novo Chamado', marcador: (p) => bannerHeading(p, 'Novo Chamado') },
+  { path: '/agenda', nome: 'Agenda Tecnica', marcador: (p) => bannerHeading(p, 'Agenda Técnica') },
+  { path: '/empreendimentos', nome: 'Empreendimentos', marcador: (p) => bannerHeading(p, 'Empreendimentos') },
+  { path: '/tecnicos', nome: 'Equipe Tecnica', marcador: (p) => bannerHeading(p, 'Equipe Técnica') },
   { path: '/perfil', nome: 'Perfil', marcador: (p) => p.getByText('Alterar Dados') },
   // /configuracoes tem guard proprio de admin — testado a parte (redireciona nao-admin).
 ];
@@ -71,9 +75,7 @@ for (const { key, cred } of ROLES) {
     test('acesso a Configuracoes respeita o guard de admin', async ({ page }) => {
       await page.goto('/configuracoes');
       if (key === 'ADMIN') {
-        await expect(
-          page.getByRole('main').getByRole('heading', { name: 'Configurações do Sistema', level: 1 })
-        ).toBeVisible();
+        await expect(bannerHeading(page, 'Configurações')).toBeVisible();
       } else {
         // Nao-admin e redirecionado para o dashboard.
         await expect(page).toHaveURL(/\/$/);
@@ -83,7 +85,7 @@ for (const { key, cred } of ROLES) {
 
     test('botao "Novo Chamado" respeita a permissao', async ({ page }) => {
       await page.goto('/chamados');
-      await expect(page.getByRole('main').getByRole('heading', { name: 'Chamados', level: 1 })).toBeVisible();
+      await expect(bannerHeading(page, 'Chamados')).toBeVisible();
       const podeCriar = key === 'ADMIN' || key === 'COORDENADOR';
       const botao = page.getByRole('button', { name: 'Novo Chamado' });
       if (podeCriar) {

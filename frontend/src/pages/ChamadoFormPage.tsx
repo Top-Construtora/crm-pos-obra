@@ -15,7 +15,6 @@ import { MateriaisTab } from '@/components/chamados/tabs/MateriaisTab'
 import { HistoricoTab } from '@/components/chamados/tabs/HistoricoTab'
 import { AnexosTab } from '@/components/chamados/tabs/AnexosTab'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -201,15 +200,11 @@ export default function ChamadoFormPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        leading={
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        }
-        title={isEditing ? `Editar Chamado #${chamado?.numero}` : 'Novo Chamado'}
-        subtitle={isEditing ? 'Atualize as informações do chamado' : 'Preencha os dados do novo chamado'}
-      />
+      <div className="flex items-center">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+      </div>
 
       {/* Tabs */}
       {isEditing && (

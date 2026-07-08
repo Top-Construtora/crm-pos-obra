@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers';
 
-// Titulo dentro do conteudo (o header/banner tem um h1 igual, por isso escopamos ao main).
-const mainHeading = (page: import('@playwright/test').Page, name: RegExp | string) =>
-  page.getByRole('main').getByRole('heading', { name, level: 1 });
+// O titulo da pagina vive no header do shell (banner); o conteudo nao repete o h1.
+const bannerHeading = (page: import('@playwright/test').Page, name: RegExp | string) =>
+  page.getByRole('banner').getByRole('heading', { name, level: 1 });
 
 test.describe('Fluxos principais (autenticado como ADMIN)', () => {
   test.beforeEach(async ({ page }) => {
@@ -21,7 +21,7 @@ test.describe('Fluxos principais (autenticado como ADMIN)', () => {
   test('lista de chamados renderiza a partir da API', async ({ page }) => {
     await page.getByRole('link', { name: 'Chamados' }).first().click();
     await expect(page).toHaveURL(/\/chamados$/);
-    await expect(mainHeading(page, 'Chamados')).toBeVisible();
+    await expect(bannerHeading(page, 'Chamados')).toBeVisible();
 
     // Contador "N chamados encontrados" bate com a quantidade de cards renderizados.
     const contador = page.getByText(/\d+ chamados encontrados/);
@@ -55,13 +55,13 @@ test.describe('Fluxos principais (autenticado como ADMIN)', () => {
     await page.goto('/chamados');
     await page.getByRole('link', { name: /Ver/ }).first().click();
     await expect(page).toHaveURL(/\/chamados\/[0-9a-f-]+$/);
-    await expect(mainHeading(page, /Chamado #\d+/)).toBeVisible();
+    await expect(bannerHeading(page, 'Detalhes do Chamado')).toBeVisible();
   });
 
   test('lista de empreendimentos (rota de admin)', async ({ page }) => {
     await page.getByRole('link', { name: 'Empreendimentos' }).first().click();
     await expect(page).toHaveURL(/\/empreendimentos$/);
-    await expect(mainHeading(page, 'Empreendimentos')).toBeVisible();
+    await expect(bannerHeading(page, 'Empreendimentos')).toBeVisible();
     // Tabela com contador de total renderiza.
     await expect(page.getByText(/Total: \d+/)).toBeVisible();
   });

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar, ChevronLeft, ChevronRight, MapPin, Clock, Route, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { agendaService, StatusAtendimento } from '@/services/agenda.service';
@@ -106,17 +105,12 @@ export default function AgendaTecnicaPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={<Calendar className="h-6 w-6" />}
-        title="Agenda Técnica"
-        subtitle="Gerencie agendamentos e roteiros de atendimento"
-        actions={
-          <Button onClick={() => setDataSelecionada(new Date())}>
-            <Calendar className="h-4 w-4 mr-2" />
-            Hoje
-          </Button>
-        }
-      />
+      <div className="flex justify-end">
+        <Button onClick={() => setDataSelecionada(new Date())}>
+          <Calendar className="h-4 w-4 mr-2" />
+          Hoje
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendário */}

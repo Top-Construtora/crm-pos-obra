@@ -566,8 +566,8 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                     {/* Avatar and Name */}
                     <div className="text-center mb-5">
                       <div
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white mx-auto mb-3"
-                        style={{ background: 'linear-gradient(135deg, hsl(var(--sidebar-accent)), hsl(174, 82%, 28%))' }}
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-[#1A1A1A] mx-auto mb-3"
+                        style={{ background: 'linear-gradient(135deg, #A9BE2E, #D2FF00)' }}
                       >
                         {getInitials(watch('clienteNome'))}
                       </div>

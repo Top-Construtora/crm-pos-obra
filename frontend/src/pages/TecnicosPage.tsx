@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, User, Users } from 'lucide-react'
+import { Plus, Pencil, Trash2, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { usersService } from '@/services/users.service'
 import { usePermissions } from '@/hooks/usePermissions'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -172,19 +171,14 @@ export default function TecnicosPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icon={<Users className="h-6 w-6" />}
-        title={isAdmin() ? 'Usuarios' : 'Tecnicos'}
-        subtitle={isAdmin() ? 'Gerencie todos os usuarios do sistema' : 'Lista de tecnicos disponiveis'}
-        actions={
-          isAdmin() ? (
-            <Button onClick={() => handleOpen()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Usuario
-            </Button>
-          ) : undefined
-        }
-      />
+      {isAdmin() && (
+        <div className="flex justify-end">
+          <Button onClick={() => handleOpen()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Usuario
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex h-64 items-center justify-center">
