@@ -174,6 +174,19 @@ CREATE TABLE IF NOT EXISTS pos_obra.agenda_tecnica (
 );
 
 -- =============================================
+-- 10. MEMBROS (equipe do Pos-Obra)
+--     A GIO libera o acesso (acesso_pos_obra); o papel operacional
+--     (GESTOR/TECNICO) e definido aqui via tela Equipe Tecnica.
+--     Sem registro = TECNICO. Admins da GIO sao sempre gestores.
+-- =============================================
+CREATE TABLE IF NOT EXISTS pos_obra.membros (
+  profile_id UUID PRIMARY KEY,
+  role VARCHAR(20) NOT NULL DEFAULT 'TECNICO',
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- =============================================
 -- INDEXES para performance
 -- =============================================
 CREATE INDEX IF NOT EXISTS idx_chamados_empreendimento ON pos_obra.chamados(empreendimento_id);
@@ -211,6 +224,9 @@ CREATE OR REPLACE TRIGGER trg_settings_atualizado_em
 CREATE OR REPLACE TRIGGER trg_agenda_atualizado_em
   BEFORE UPDATE ON pos_obra.agenda_tecnica FOR EACH ROW EXECUTE FUNCTION pos_obra.update_atualizado_em();
 
+CREATE OR REPLACE TRIGGER trg_membros_atualizado_em
+  BEFORE UPDATE ON pos_obra.membros FOR EACH ROW EXECUTE FUNCTION pos_obra.update_atualizado_em();
+
 -- =============================================
 -- Dados iniciais (Settings padrao)
 -- =============================================
@@ -246,7 +262,7 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'chamados','historicos','comentarios','vistorias','materiais',
-    'anexos','notificacoes','settings','agenda_tecnica'
+    'anexos','notificacoes','settings','agenda_tecnica','membros'
   ]
   LOOP
     EXECUTE format('ALTER TABLE pos_obra.%I ENABLE ROW LEVEL SECURITY;', t);

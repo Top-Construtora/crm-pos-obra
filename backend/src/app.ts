@@ -17,6 +17,7 @@ import { settingsRoutes } from './routes/settings.routes.js';
 import { classificacaoRoutes } from './routes/classificacao.routes.js';
 import { portalClienteRoutes } from './routes/portal-cliente.routes.js';
 import { agendaRoutes } from './routes/agenda.routes.js';
+import { equipeRoutes } from './routes/equipe.routes.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
 
 // Ensure uploads directory exists
@@ -36,6 +37,7 @@ app.use(cors({
     'http://localhost:3000',
     'http://localhost:5173',
     'https://crm-pos-obra-frontend.vercel.app',
+    'https://crm-pos-obra.vercel.app',
     process.env.FRONTEND_URL,
   ].filter(Boolean) as string[],
   credentials: true,
@@ -54,6 +56,7 @@ app.use('/api/notificacoes', notificacoesRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/classificacao', classificacaoRoutes);
 app.use('/api/agenda', agendaRoutes);
+app.use('/api/equipe', equipeRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static(uploadsDir));

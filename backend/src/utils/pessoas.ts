@@ -1,7 +1,9 @@
 // Resolucao de pessoas a partir de public.profiles (banco GIO).
 // Nao ha FK cross-schema entre pos_obra e public.profiles, entao os nomes
 // sao resolvidos aqui, sob demanda, a partir dos uuids guardados nos chamados.
-import { supabaseGio } from '../config/supabase.js';
+// Usa o client ADMIN (service key): a RLS de profiles so permite SELECT para
+// "authenticated", e o backend opera com anon key (nomes viravam "-").
+import { supabaseGio, supabaseGioAdmin } from '../config/supabase.js';
 
 export interface Pessoa {
   id: string;
@@ -14,9 +16,10 @@ export interface Pessoa {
  */
 export async function nomesDeProfiles(ids: (string | null | undefined)[]): Promise<Record<string, string>> {
   const unicos = [...new Set(ids.filter((v): v is string => !!v))];
-  if (unicos.length === 0 || !supabaseGio) return {};
+  const client = supabaseGioAdmin || supabaseGio;
+  if (unicos.length === 0 || !client) return {};
 
-  const { data, error } = await supabaseGio
+  const { data, error } = await client
     .from('profiles')
     .select('id, name')
     .in('id', unicos);

@@ -1,4 +1,4 @@
-import { supabase, supabaseGio } from '../config/supabase.js';
+import { supabase, supabaseGio, supabaseGioAdmin } from '../config/supabase.js';
 import { getIO } from '../socket.js';
 import { toCamel } from './db.js';
 import { sendNewChamadoEmail, sendStatusChangeEmail, sendSlaAlertEmail } from '../services/email.service.js';
@@ -63,11 +63,12 @@ async function sendEmailForNotification(
     horasRestantes?: number;
   },
 ): Promise<void> {
-  if (!emailData || !supabaseGio) return;
+  const clientGio = supabaseGioAdmin || supabaseGio;
+  if (!emailData || !clientGio) return;
 
   // Email vem de public.profiles (GIO). Nem todo profile tem coluna/valor de
   // email; nesse caso apenas nao enviamos (best-effort, ja gated por settings).
-  const { data: user } = await supabaseGio
+  const { data: user } = await clientGio
     .from('profiles')
     .select('*')
     .eq('id', usuarioId)

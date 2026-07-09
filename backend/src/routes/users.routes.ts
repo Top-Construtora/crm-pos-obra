@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
-import { supabaseGio } from '../config/supabase.js';
+import { supabaseGio, supabaseGioAdmin } from '../config/supabase.js';
 import { authMiddleware, requireGerenciar } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../types/index.js';
+import { listarEquipe } from '../services/equipe.service.js';
 
 // Os usuarios do Pos-Obra sao os de public.profiles (GIO). A gestao de usuarios
 // (criar/editar/senha/avatar) e feita no proprio GIO; aqui as rotas sao apenas
@@ -53,16 +54,17 @@ router.get('/', requireGerenciar, async (_req, res: Response) => {
 });
 
 // GET /api/users/tecnicos - pessoas atribuiveis como responsavel
+// = equipe do Pos-Obra (profiles ativos com acesso_pos_obra, sem admins).
 router.get('/tecnicos', async (_req, res: Response) => {
   try {
-    if (!supabaseGio) return gioIndisponivel(res);
-    const { data, error } = await supabaseGio
-      .from('profiles')
-      .select('id, name, role, ativo')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    res.json((data || []).filter((p: any) => p.ativo !== false).map(mapProfile));
+    if (!supabaseGioAdmin) return gioIndisponivel(res);
+    const equipe = await listarEquipe();
+    res.json(equipe.map((m) => ({
+      id: m.id,
+      nome: m.nome,
+      role: m.papel === 'GESTOR' ? 'COORDENADOR' : 'TECNICO',
+      ativo: true,
+    })));
   } catch (error) {
     console.error('List tecnicos error:', error);
     res.status(500).json({ error: 'Erro ao listar tecnicos' });
