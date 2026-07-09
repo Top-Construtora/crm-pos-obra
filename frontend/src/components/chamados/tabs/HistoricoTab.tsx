@@ -35,9 +35,11 @@ export function HistoricoTab({ chamadoId, chamado }: HistoricoTabProps) {
     onError: () => toast.error('Erro ao adicionar comentario'),
   })
 
-  const handleSubmitComentario = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!comentario.trim()) return
+  // Nao usar <form> aqui: este componente e renderizado DENTRO do <form> do
+  // ChamadoModal, e form aninhado faz o submit "vazar" para o form externo
+  // (recarrega a pagina em vez de salvar). Enviamos via botao/Enter.
+  const submitComentario = () => {
+    if (!comentario.trim() || addComentarioMutation.isPending) return
     addComentarioMutation.mutate(comentario.trim())
   }
 
@@ -66,7 +68,7 @@ export function HistoricoTab({ chamadoId, chamado }: HistoricoTabProps) {
   return (
     <div>
       {/* Add comment form */}
-      <form onSubmit={handleSubmitComentario} className="mb-6">
+      <div className="mb-6">
         <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-sidebar-accent" />
           Adicionar Comentario
@@ -75,12 +77,19 @@ export function HistoricoTab({ chamadoId, chamado }: HistoricoTabProps) {
           <Input
             value={comentario}
             onChange={(e) => setComentario(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                submitComentario()
+              }
+            }}
             placeholder="Digite seu comentario..."
             className="flex-1"
           />
           <Button
-            type="submit"
+            type="button"
             size="sm"
+            onClick={submitComentario}
             className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-[#1A1A1A] px-4"
             disabled={!comentario.trim() || addComentarioMutation.isPending}
           >
@@ -91,7 +100,7 @@ export function HistoricoTab({ chamadoId, chamado }: HistoricoTabProps) {
             )}
           </Button>
         </div>
-      </form>
+      </div>
 
       {/* Timeline */}
       <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
