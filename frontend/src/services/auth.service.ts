@@ -24,6 +24,19 @@ export const authService = {
     }
   },
 
+  // Login Microsoft (Entra/Azure) via Supabase Auth da GIO. Redireciona para a
+  // Microsoft e volta para a origem; a sessao e restaurada no retorno.
+  async loginWithMicrosoft(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        scopes: 'email',
+        redirectTo: window.location.origin,
+      },
+    })
+    if (error) throw error
+  },
+
   async me(): Promise<{ user: User }> {
     const response = await api.get<{ user: User }>('/auth/me')
     return response.data

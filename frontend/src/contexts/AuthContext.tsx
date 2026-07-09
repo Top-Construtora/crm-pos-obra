@@ -10,6 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (credentials: LoginCredentials) => Promise<void>
+  loginWithMicrosoft: () => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -21,7 +22,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
-  // Restaura a sessao do Supabase (se houver) e carrega o perfil do backend.
+  // Restaura a sessao do Supabase (se houver, inclusive apos retorno do OAuth
+  // Microsoft) e carrega o perfil do backend.
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession()
@@ -29,7 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const response = await authService.me()
           setUser(response.user)
-        } catch {
+        } catch (error: any) {
+          // Autenticou no Supabase mas nao tem acesso ao modulo: encerra sessao.
+          if (error?.response?.status === 403) {
+            toast.error(error.response.data?.error || 'Sem acesso ao modulo Pos-Obra')
+          }
           await supabase.auth.signOut()
           setUser(null)
         }
@@ -73,6 +79,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loginWithMicrosoft = async () => {
+    try {
+      // Redireciona para a Microsoft; o retorno e tratado no checkAuth.
+      await authService.loginWithMicrosoft()
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao entrar com Microsoft')
+      throw error
+    }
+  }
+
   const logout = () => {
     authService.logout().catch(() => {})
     setUser(null)
@@ -96,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithMicrosoft,
         logout,
         refreshUser,
       }}
