@@ -26,8 +26,10 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
+  // true quando o usuario tem a permissao gerenciar_pos_obra na GIO.
+  podeGerenciar?: boolean;
   ativo: boolean;
-  criadoEm: string;
+  criadoEm?: string;
 }
 
 // Empreendimento

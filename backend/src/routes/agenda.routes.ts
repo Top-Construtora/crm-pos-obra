@@ -2,19 +2,29 @@ import { Router, Response } from 'express';
 import { supabase } from '../config/supabase.js';
 import { authMiddleware, requireRoles } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../types/index.js';
-import { toCamel, sanitizeUser } from '../utils/db.js';
+import { toCamel } from '../utils/db.js';
+import { nomesDeProfiles, pessoaDe } from '../utils/pessoas.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-function processAgenda(raw: any) {
-  const agenda = toCamel(raw);
-  if (agenda.tecnico) agenda.tecnico = sanitizeUser(agenda.tecnico);
-  if (agenda.chamado?.empreendimento) {
-    agenda.chamado.empreendimento = toCamel(agenda.chamado.empreendimento);
-  }
-  return agenda;
+// chamado:chamados(*) e embed do mesmo schema (pos_obra) e continua valido.
+// O tecnico (profiles) e o empreendimento (obras_top) sao resolvidos aqui.
+const AGENDA_SELECT = '*, chamado:chamados(*)';
+
+async function hidratarAgendas(rawList: any[]): Promise<any[]> {
+  const nomes = await nomesDeProfiles(rawList.map((r) => r.tecnico_id));
+  return rawList.map((raw) => {
+    const agenda = toCamel(raw);
+    agenda.tecnico = pessoaDe(agenda.tecnicoId, nomes);
+    if (agenda.chamado) {
+      agenda.chamado.empreendimento = agenda.chamado.empreendimentoId
+        ? { id: agenda.chamado.empreendimentoId, nome: agenda.chamado.empreendimentoNome || null }
+        : null;
+    }
+    return agenda;
+  });
 }
 
 // GET /api/agenda
@@ -25,7 +35,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('agenda_tecnica')
-      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .select(AGENDA_SELECT)
       .order('data_agendamento', { ascending: true })
       .order('hora_inicio', { ascending: true })
       .order('ordem_roteiro', { ascending: true });
@@ -43,7 +53,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const { data: agendamentos, error } = await query;
     if (error) throw error;
 
-    res.json((agendamentos || []).map(processAgenda));
+    res.json(await hidratarAgendas(agendamentos || []));
   } catch (error) {
     console.error('List agenda error:', error);
     res.status(500).json({ error: 'Erro ao listar agendamentos' });
@@ -70,7 +80,7 @@ router.get('/calendario/:ano/:mes', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('agenda_tecnica')
-      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .select(AGENDA_SELECT)
       .gte('data_agendamento', dataInicio)
       .lte('data_agendamento', dataFim)
       .order('data_agendamento', { ascending: true })
@@ -86,8 +96,8 @@ router.get('/calendario/:ano/:mes', async (req: AuthRequest, res: Response) => {
     if (error) throw error;
 
     const calendario: Record<string, any[]> = {};
-    (agendamentos || []).forEach((raw) => {
-      const ag = processAgenda(raw);
+    const ags = await hidratarAgendas(agendamentos || []);
+    ags.forEach((ag) => {
       if (!calendario[ag.dataAgendamento]) {
         calendario[ag.dataAgendamento] = [];
       }
@@ -142,7 +152,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { data: raw, error } = await supabase
       .from('agenda_tecnica')
-      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .select(AGENDA_SELECT)
       .eq('id', req.params.id)
       .single();
 
@@ -150,7 +160,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Agendamento nao encontrado' });
     }
 
-    const agenda = processAgenda(raw);
+    const [agenda] = await hidratarAgendas([raw]);
     const user = req.user!;
     if (user.role === 'TECNICO' && agenda.tecnicoId !== user.id) {
       return res.status(403).json({ error: 'Acesso nao autorizado' });
@@ -195,11 +205,11 @@ router.post('/', requireRoles('ADMIN', 'COORDENADOR'), async (req: AuthRequest, 
         longitude: longitude || null,
         status: 'AGENDADO',
       })
-      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .select(AGENDA_SELECT)
       .single();
 
     if (error) throw error;
-    res.status(201).json(processAgenda(agenda));
+    res.status(201).json((await hidratarAgendas([agenda]))[0]);
   } catch (error) {
     console.error('Create agenda error:', error);
     res.status(500).json({ error: 'Erro ao criar agendamento' });
@@ -255,11 +265,11 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       .from('agenda_tecnica')
       .update(updates)
       .eq('id', req.params.id)
-      .select('*, chamado:chamados(*, empreendimento:empreendimentos(*)), tecnico:users!tecnico_id(*)')
+      .select(AGENDA_SELECT)
       .single();
 
     if (error) throw error;
-    res.json(processAgenda(updated));
+    res.json((await hidratarAgendas([updated]))[0]);
   } catch (error) {
     console.error('Update agenda error:', error);
     res.status(500).json({ error: 'Erro ao atualizar agendamento' });

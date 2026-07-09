@@ -1,13 +1,28 @@
 import { Router, Response } from 'express';
-import { supabase } from '../config/supabase.js';
+import { supabase, supabaseGio } from '../config/supabase.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { AuthRequest } from '../types/index.js';
 import { calcularSLA } from '../utils/sla.js';
-import { toCamel, sanitizeUser } from '../utils/db.js';
+import { toCamel } from '../utils/db.js';
+import { nomesDeProfiles, pessoaDe } from '../utils/pessoas.js';
 
 const router = Router();
 
 router.use(authMiddleware);
+
+// Hidrata uma lista de chamados (raw) com responsavel (de profiles) e
+// empreendimento (denormalizado). Sem embeds cross-schema.
+async function hidratarChamados(rows: any[]): Promise<any[]> {
+  const lista = (rows || []).map(toCamel);
+  const nomes = await nomesDeProfiles(lista.map((c: any) => c.responsavelId));
+  lista.forEach((c: any) => {
+    c.responsavel = pessoaDe(c.responsavelId, nomes);
+    c.empreendimento = c.empreendimentoId
+      ? { id: c.empreendimentoId, nome: c.empreendimentoNome || null }
+      : null;
+  });
+  return lista;
+}
 
 // Helper: buscar chamados com filtro de tecnico
 async function fetchChamados(user: any, filters: any = {}, selectFields = '*') {
@@ -77,7 +92,7 @@ router.get('/sla-proximos', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('chamados')
-      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*)')
+      .select('*')
       .in('status', ['ABERTO', 'EM_ANDAMENTO', 'AGUARDANDO'])
       .order('criado_em', { ascending: true });
 
@@ -88,14 +103,11 @@ router.get('/sla-proximos', async (req: AuthRequest, res: Response) => {
     const { data: chamados, error } = await query;
     if (error) throw error;
 
-    const chamadosComSLA = (chamados || [])
-      .map((c) => {
-        const chamado = toCamel(c);
-        if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
-        return { ...chamado, slaInfo: calcularSLA(chamado) };
-      })
-      .filter((c) => c.slaInfo.status === 'VENCIDO' || c.slaInfo.status === 'PROXIMO_VENCIMENTO')
-      .sort((a, b) => a.slaInfo.tempoRestante - b.slaInfo.tempoRestante)
+    const lista = await hidratarChamados(chamados || []);
+    const chamadosComSLA = lista
+      .map((chamado: any) => ({ ...chamado, slaInfo: calcularSLA(chamado) }))
+      .filter((c: any) => c.slaInfo.status === 'VENCIDO' || c.slaInfo.status === 'PROXIMO_VENCIMENTO')
+      .sort((a: any, b: any) => a.slaInfo.tempoRestante - b.slaInfo.tempoRestante)
       .slice(0, 10);
 
     res.json(chamadosComSLA);
@@ -112,7 +124,7 @@ router.get('/recentes', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('chamados')
-      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*)')
+      .select('*')
       .order('criado_em', { ascending: false })
       .limit(5);
 
@@ -123,11 +135,8 @@ router.get('/recentes', async (req: AuthRequest, res: Response) => {
     const { data: chamados, error } = await query;
     if (error) throw error;
 
-    const result = (chamados || []).map((c) => {
-      const chamado = toCamel(c);
-      if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
-      return { ...chamado, slaInfo: calcularSLA(chamado) };
-    });
+    const lista = await hidratarChamados(chamados || []);
+    const result = lista.map((chamado: any) => ({ ...chamado, slaInfo: calcularSLA(chamado) }));
 
     res.json(result);
   } catch (error) {
@@ -291,12 +300,17 @@ router.get('/sla-compliance', async (req: AuthRequest, res: Response) => {
 // GET /api/dashboard/por-tecnico
 router.get('/por-tecnico', async (req: AuthRequest, res: Response) => {
   try {
-    const { data: tecnicos, error: tecError } = await supabase
-      .from('users')
-      .select('id, nome, role')
-      .eq('ativo', true);
+    if (!supabaseGio) return res.status(503).json({ error: 'Integracao com o GIO nao configurada.' });
+
+    const { data: profiles, error: tecError } = await supabaseGio
+      .from('profiles')
+      .select('id, name, role, ativo');
 
     if (tecError) throw tecError;
+
+    const tecnicos = (profiles || [])
+      .filter((p: any) => p.ativo !== false)
+      .map((p: any) => ({ id: p.id, nome: p.name, role: p.role }));
 
     // Buscar todos chamados de uma vez
     const { data: todosChamados, error: chamError } = await supabase
@@ -368,7 +382,7 @@ router.get('/reincidencia', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('chamados')
-      .select('*, empreendimento:empreendimentos(nome)')
+      .select('*')
       .gte('criado_em', dataLimite);
 
     if (user.role === 'TECNICO') {
@@ -389,7 +403,7 @@ router.get('/reincidencia', async (req: AuthRequest, res: Response) => {
     const enriched = Array.from(groupMap.entries())
       .filter(([, items]) => items.length > 1)
       .map(([, items]) => ({
-        empreendimento: items[0]?.empreendimento?.nome || 'N/A',
+        empreendimento: items[0]?.empreendimento_nome || 'N/A',
         unidade: items[0].unidade,
         categoria: items[0].categoria,
         total: items.length,

@@ -8,7 +8,12 @@ if (!supabaseUrl || !supabaseKey) {
   console.warn('SUPABASE_URL ou SUPABASE_ANON_KEY nao configuradas. Configure no arquivo .env');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// As tabelas do CRM ficam num schema dedicado (pos_obra) dentro do
+// Supabase da GIO, isolado do public. Lembre de expor "pos_obra" em
+// Project Settings > API > Exposed schemas.
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  db: { schema: 'pos_obra' },
+});
 
 // Banco GIO - Dados compartilhados (obras, colaboradores)
 const gioUrl = process.env.GIO_SUPABASE_URL || '';

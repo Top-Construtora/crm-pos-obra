@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase.js';
+import { supabase, supabaseGio } from '../config/supabase.js';
 import { getIO } from '../socket.js';
 import { toCamel } from './db.js';
 import { sendNewChamadoEmail, sendStatusChangeEmail, sendSlaAlertEmail } from '../services/email.service.js';
@@ -63,24 +63,27 @@ async function sendEmailForNotification(
     horasRestantes?: number;
   },
 ): Promise<void> {
-  if (!emailData) return;
+  if (!emailData || !supabaseGio) return;
 
-  const { data: user } = await supabase
-    .from('users')
-    .select('email')
+  // Email vem de public.profiles (GIO). Nem todo profile tem coluna/valor de
+  // email; nesse caso apenas nao enviamos (best-effort, ja gated por settings).
+  const { data: user } = await supabaseGio
+    .from('profiles')
+    .select('*')
     .eq('id', usuarioId)
     .single();
 
-  if (!user?.email) return;
+  const email = (user as any)?.email;
+  if (!email) return;
 
   const { chamadoNumero, descricao, statusAnterior, statusNovo, horasRestantes } = emailData;
 
   if (tipo === 'ATRIBUICAO' && chamadoNumero && descricao) {
-    await sendNewChamadoEmail(user.email, chamadoNumero, descricao);
+    await sendNewChamadoEmail(email, chamadoNumero, descricao);
   } else if (tipo === 'STATUS_ALTERADO' && chamadoNumero && statusAnterior && statusNovo) {
-    await sendStatusChangeEmail(user.email, chamadoNumero, statusAnterior, statusNovo);
+    await sendStatusChangeEmail(email, chamadoNumero, statusAnterior, statusNovo);
   } else if (tipo === 'SLA_ALERTA' && chamadoNumero && horasRestantes !== undefined) {
-    await sendSlaAlertEmail(user.email, chamadoNumero, horasRestantes);
+    await sendSlaAlertEmail(email, chamadoNumero, horasRestantes);
   }
 }
 
