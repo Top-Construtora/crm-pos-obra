@@ -20,9 +20,13 @@ CREATE TABLE IF NOT EXISTS pos_obra.membros (
 CREATE OR REPLACE TRIGGER trg_membros_atualizado_em
   BEFORE UPDATE ON pos_obra.membros FOR EACH ROW EXECUTE FUNCTION pos_obra.update_atualizado_em();
 
--- Grants ja cobertos pelos DEFAULT PRIVILEGES do schema; garante mesmo assim.
-GRANT ALL ON pos_obra.membros TO anon, authenticated, service_role;
+-- SEM anon: acesso anonimo ao schema foi revogado (seguranca — a anon key e
+-- publica). O backend usa service_role; authenticated fica como belt-and-
+-- suspenders, espelhando a migration 20260721100000_pos_obra_revoke_anon (GIO).
+GRANT ALL ON pos_obra.membros TO authenticated, service_role;
 
 ALTER TABLE pos_obra.membros ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for anon" ON pos_obra.membros;
-CREATE POLICY "Allow all for anon" ON pos_obra.membros FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS pos_obra_membros_authenticated ON pos_obra.membros;
+CREATE POLICY pos_obra_membros_authenticated ON pos_obra.membros
+  AS PERMISSIVE FOR ALL TO authenticated USING (true) WITH CHECK (true);

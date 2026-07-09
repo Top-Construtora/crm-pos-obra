@@ -238,24 +238,28 @@ INSERT INTO pos_obra.settings (chave, valor) VALUES
 ON CONFLICT (chave) DO NOTHING;
 
 -- =============================================
--- GRANTS para o PostgREST (roles anon/authenticated)
--- O backend usa a anon key para os dados; a autorizacao real e feita no
--- Express (JWT do Supabase + gio_has_access).
+-- GRANTS para o PostgREST
+-- NUNCA conceder a `anon`: a anon key e publica e o schema fica exposto no
+-- PostgREST — acesso anonimo foi revogado na GIO (migration
+-- 20260721100000_pos_obra_revoke_anon). O backend acessa os dados com a
+-- SERVICE KEY (service_role, BYPASSRLS); a autorizacao de negocio e feita
+-- no Express (JWT do Supabase + gio_has_access).
 -- =============================================
-GRANT USAGE ON SCHEMA pos_obra TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA pos_obra TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA pos_obra TO anon, authenticated, service_role;
-GRANT ALL ON ALL FUNCTIONS IN SCHEMA pos_obra TO anon, authenticated, service_role;
+GRANT USAGE ON SCHEMA pos_obra TO authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA pos_obra TO authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA pos_obra TO authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA pos_obra TO authenticated, service_role;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA pos_obra
-  GRANT ALL ON TABLES TO anon, authenticated, service_role;
+  GRANT ALL ON TABLES TO authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA pos_obra
-  GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+  GRANT ALL ON SEQUENCES TO authenticated, service_role;
 
 -- =============================================
 -- RLS (Row Level Security)
--- Policies permissivas: o backend (anon key) acessa tudo; a seguranca de fato
--- vem do JWT do Supabase + gio_has_access no Express.
+-- O backend acessa via service_role (BYPASSRLS). As policies abaixo cobrem
+-- apenas `authenticated` (belt-and-suspenders; espelha a migration
+-- 20260721100000_pos_obra_revoke_anon da GIO). `anon` nao tem policy nem grant.
 -- =============================================
 DO $$
 DECLARE t TEXT;
@@ -267,7 +271,9 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE pos_obra.%I ENABLE ROW LEVEL SECURITY;', t);
     EXECUTE format('DROP POLICY IF EXISTS "Allow all for anon" ON pos_obra.%I;', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON pos_obra.%I;', 'pos_obra_' || t || '_authenticated', t);
     EXECUTE format(
-      'CREATE POLICY "Allow all for anon" ON pos_obra.%I FOR ALL USING (true) WITH CHECK (true);', t);
+      'CREATE POLICY %I ON pos_obra.%I AS PERMISSIVE FOR ALL TO authenticated USING (true) WITH CHECK (true);',
+      'pos_obra_' || t || '_authenticated', t);
   END LOOP;
 END $$;

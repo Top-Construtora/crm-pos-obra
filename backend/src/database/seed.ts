@@ -7,7 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 // Os chamados de demonstracao devem ser criados pela propria aplicacao (assim
 // referenciam profiles/obras reais). Este script apenas garante as settings.
 const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+// service_role: o acesso anonimo ao schema pos_obra foi revogado (seguranca).
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey, {
   db: { schema: 'pos_obra' },
 });
