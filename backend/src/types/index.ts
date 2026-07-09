@@ -20,20 +20,14 @@ export interface UserData {
   id: string;
   nome: string;
   email: string;
-  senha?: string;
+  // role e derivado das permissoes da GIO: COORDENADOR (pode gerenciar) ou
+  // TECNICO. Mantido para compatibilidade com o scoping existente.
   role: UserRole;
+  podeGerenciar: boolean;
   ativo: boolean;
   avatar?: string;
-  criadoEm: string;
-  atualizadoEm: string;
 }
 
 export interface AuthRequest extends Request {
   user?: UserData;
-}
-
-export interface JwtPayload {
-  userId: string;
-  email: string;
-  role: UserRole;
 }

@@ -173,37 +173,30 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with period selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-muted-foreground">
-            Visão geral dos chamados de assistência técnica
-          </p>
+      {/* Toolbar: período + ação */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex bg-muted rounded-lg p-1">
+          {PERIODO_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setPeriodo(opt.value)}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                periodo === opt.value
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-muted rounded-lg p-1">
-            {PERIODO_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setPeriodo(opt.value)}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
-                  periodo === opt.value
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          {canCreateChamado() && (
-            <Button size="lg" onClick={() => setModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Chamado
-            </Button>
-          )}
-        </div>
+        {canCreateChamado() && (
+          <Button size="lg" onClick={() => setModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Chamado
+          </Button>
+        )}
       </div>
 
       {/* Row 1: Stat Cards */}
@@ -524,7 +517,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <CardTitle className="text-base font-semibold">SLA Critico</CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary">
+            <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
               <Link to="/chamados">
                 Ver todos <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
@@ -572,7 +565,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <CardTitle className="text-base font-semibold">Chamados Recentes</CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary">
+            <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
               <Link to="/chamados">
                 Ver todos <ArrowRight className="ml-1 h-4 w-4" />
               </Link>

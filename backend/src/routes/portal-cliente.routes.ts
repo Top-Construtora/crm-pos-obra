@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase.js';
 import { calcularSLA } from '../utils/sla.js';
 import { toCamel } from '../utils/db.js';
+import { nomesDeProfiles } from '../utils/pessoas.js';
 
 const router = Router();
 
@@ -20,9 +21,10 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Numero de chamado invalido' });
     }
 
+    // historico:historicos(*) e embed do mesmo schema (pos_obra) e continua valido.
     const { data: chamadoRaw, error } = await supabase
       .from('chamados')
-      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(nome), historico:historicos(*, usuario:users(nome))')
+      .select('*, historico:historicos(*)')
       .eq('numero', chamadoNum)
       .single();
 
@@ -45,11 +47,16 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Telefone ou email nao corresponde ao chamado' });
     }
 
+    // Nomes de responsavel e autores do historico (profiles).
+    const nomes = await nomesDeProfiles([
+      chamado.responsavelId,
+      ...(chamado.historico || []).map((h: any) => h.usuarioId),
+    ]);
+
     const response = {
       numero: chamado.numero,
       empreendimento: {
-        nome: chamado.empreendimento?.nome,
-        endereco: chamado.empreendimento?.endereco,
+        nome: chamado.empreendimentoNome || null,
       },
       unidade: chamado.unidade,
       clienteNome: chamado.clienteNome,
@@ -58,7 +65,7 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
       descricao: chamado.descricao,
       prioridade: chamado.prioridade,
       status: chamado.status,
-      responsavel: chamado.responsavel ? { nome: chamado.responsavel.nome } : null,
+      responsavel: chamado.responsavelId ? { nome: nomes[chamado.responsavelId] || '-' } : null,
       criadoEm: chamado.criadoEm,
       atualizadoEm: chamado.atualizadoEm,
       finalizadoEm: chamado.finalizadoEm,
@@ -68,7 +75,7 @@ router.get('/rastrear/:numero', async (req: Request, res: Response) => {
         .map((h: any) => ({
           tipo: h.tipo,
           descricao: h.descricao,
-          usuario: h.usuario?.nome || 'Sistema',
+          usuario: nomes[h.usuarioId] || 'Sistema',
           criadoEm: h.criadoEm,
         })),
     };
@@ -93,7 +100,7 @@ router.get('/meus-chamados', async (req: Request, res: Response) => {
 
     let query = supabase
       .from('chamados')
-      .select('*, empreendimento:empreendimentos(nome), responsavel:users!responsavel_id(nome)')
+      .select('*')
       .order('criado_em', { ascending: false });
 
     if (identificadorStr.includes('@')) {
@@ -117,17 +124,19 @@ router.get('/meus-chamados', async (req: Request, res: Response) => {
       });
     }
 
+    const nomes = await nomesDeProfiles(filtered.map((c: any) => c.responsavel_id));
+
     const response = filtered.map((c) => {
       const chamado = toCamel(c);
       return {
         numero: chamado.numero,
-        empreendimento: { nome: chamado.empreendimento?.nome },
+        empreendimento: { nome: chamado.empreendimentoNome || null },
         unidade: chamado.unidade,
         categoria: chamado.categoria,
         descricao: chamado.descricao,
         prioridade: chamado.prioridade,
         status: chamado.status,
-        responsavel: chamado.responsavel ? { nome: chamado.responsavel.nome } : null,
+        responsavel: chamado.responsavelId ? { nome: nomes[chamado.responsavelId] || '-' } : null,
         criadoEm: chamado.criadoEm,
         atualizadoEm: chamado.atualizadoEm,
         finalizadoEm: chamado.finalizadoEm,

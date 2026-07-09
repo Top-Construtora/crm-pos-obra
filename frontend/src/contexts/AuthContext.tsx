@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, LoginCredentials, AuthResponse } from '@/types'
+import { User, LoginCredentials } from '@/types'
 import { authService } from '@/services/auth.service'
+import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 
 interface AuthContextType {
@@ -20,21 +21,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
+  // Restaura a sessao do Supabase (se houver) e carrega o perfil do backend.
   useEffect(() => {
     const checkAuth = async () => {
-      const token = sessionStorage.getItem('token')
-      if (token) {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
         try {
           const response = await authService.me()
           setUser(response.user)
         } catch {
-          sessionStorage.removeItem('token')
+          await supabase.auth.signOut()
           setUser(null)
         }
       }
       setIsLoading(false)
     }
     checkAuth()
+  }, [])
+
+  // Reage ao fim da sessao do Supabase (signOut / refresh falho).
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
+    })
+    return () => sub.subscription.unsubscribe()
   }, [])
 
   // Escuta eventos de 401 do interceptor para deslogar via React Router
@@ -49,21 +61,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (credentials: LoginCredentials) => {
     try {
-      const response: AuthResponse = await authService.login(credentials)
-      sessionStorage.setItem('token', response.token)
+      const response = await authService.login(credentials)
       setUser(response.user)
       toast.success(`Bem-vindo, ${response.user.nome}!`)
       navigate('/')
     } catch (error: any) {
-      const rawError = error.response?.data?.error
-      const message = typeof rawError === 'string' ? rawError : 'Erro ao fazer login'
+      const message =
+        error.response?.data?.error || error.message || 'Erro ao fazer login'
       toast.error(message)
       throw error
     }
   }
 
   const logout = () => {
-    sessionStorage.removeItem('token')
+    authService.logout().catch(() => {})
     setUser(null)
     toast.info('Logout realizado com sucesso')
     navigate('/login')

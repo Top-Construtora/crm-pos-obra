@@ -19,8 +19,8 @@
     --card-foreground: 0 0% 9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 72 100% 50%;
+    --primary-foreground: 0 0% 10%;
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96%;
@@ -37,14 +37,14 @@
     --info-foreground: 0 0% 98%;
     --border: 0 0% 90%;
     --input: 0 0% 90%;
-    --ring: 0 0% 9%;
+    --ring: 72 100% 50%;
     --radius: 0.5rem;
 
     /* Sidebar colors - Dark */
     --sidebar: 210 40% 14%;
     --sidebar-foreground: 210 20% 96%;
     --sidebar-muted: 210 30% 22%;
-    --sidebar-accent: 174 82% 38%;
+    --sidebar-accent: 68 61% 46%;
   }
 
   .dark {
@@ -72,7 +72,7 @@
     --sidebar: 215 28% 10%;
     --sidebar-foreground: 210 20% 96%;
     --sidebar-muted: 215 25% 17%;
-    --sidebar-accent: 174 82% 38%;
+    --sidebar-accent: 72 100% 50%;
   }
 }
 
@@ -195,6 +195,14 @@
 /* Minimal background for main content */
 .main-bg {
   @apply bg-background;
+}
+
+/* Zoom de conteudo (75%) apenas em telas de notebook — para caber melhor
+   (ex.: kanban). Nao afeta monitores grandes (>=1920) nem mobile/tablet. */
+@media (min-width: 1024px) and (max-width: 1680px) {
+  .app-content-zoom {
+    zoom: 0.75;
+  }
 }
 
 /* Mobile responsiveness */

@@ -136,8 +136,8 @@ export default function ProfilePage() {
                   />
                 ) : (
                   <span
-                    className="text-2xl font-bold text-white w-full h-full flex items-center justify-center"
-                    style={{ background: 'linear-gradient(135deg, #12b0a0 0%, #0d8a7c 100%)' }}
+                    className="text-2xl font-bold text-[#1A1A1A] w-full h-full flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #A9BE2E, #D2FF00)' }}
                   >
                     {profile?.nome ? getInitials(profile.nome) : 'U'}
                   </span>
@@ -158,7 +158,7 @@ export default function ProfilePage() {
               <h2 className="text-xl font-bold">{profile?.nome || authUser?.nome}</h2>
               <p className="text-sm text-muted-foreground">{profile?.email || authUser?.email}</p>
               <div className="flex items-center gap-2 mt-2 justify-center sm:justify-start">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-foreground">
                   <Shield className="h-3 w-3" />
                   {profile?.role ? ROLE_LABELS[profile.role as keyof typeof ROLE_LABELS] : ''}
                 </span>

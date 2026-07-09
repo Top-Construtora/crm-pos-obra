@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Settings, Save, Mail, Clock, Tag } from 'lucide-react'
+import { Save, Mail, Clock, Tag } from 'lucide-react'
 import { settingsService } from '@/services/settings.service'
 import { usePermissions } from '@/hooks/usePermissions'
 import { Button } from '@/components/ui/button'
@@ -102,16 +102,6 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Settings className="h-6 w-6 text-primary" />
-          Configurações do Sistema
-        </h1>
-        <p className="text-muted-foreground">
-          Gerencie as configurações gerais do sistema
-        </p>
-      </div>
-
       {/* Geral */}
       <Card>
         <CardHeader>
@@ -170,7 +160,7 @@ export default function ConfiguracoesPage() {
                 onClick={() => handleToggleCategoria(key)}
                 className={`p-3 rounded-lg border text-sm font-medium transition-all ${
                   categoriasAtivas.includes(key)
-                    ? 'bg-primary/10 border-primary text-primary'
+                    ? 'bg-primary/10 border-primary text-foreground'
                     : 'bg-muted/50 border-border text-muted-foreground hover:bg-muted'
                 }`}
               >

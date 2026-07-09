@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { Bell, CheckCheck } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { useNotificacoes } from '@/hooks/useNotificacoes'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -34,19 +33,16 @@ export function NotificacoesDropdown() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="relative hover:bg-muted"
+      <button
+        aria-label="notificações"
+        className="relative flex items-center justify-center w-9 h-9 rounded-[6px] text-[#ECECEE] hover:bg-[#32323A] hover:text-white transition-colors"
         onClick={() => setOpen(!open)}
       >
-        <Bell className="h-5 w-5 text-muted-foreground" />
+        <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
+          <span className="absolute top-2 right-2 w-[7px] h-[7px] rounded-full bg-[#DC2626] border-2 border-[#1A1A1A]" />
         )}
-      </Button>
+      </button>
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-[380px] bg-card border rounded-xl shadow-xl z-50 overflow-hidden">

@@ -81,7 +81,7 @@ export function HistoricoTab({ chamadoId, chamado }: HistoricoTabProps) {
           <Button
             type="submit"
             size="sm"
-            className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-white px-4"
+            className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-[#1A1A1A] px-4"
             disabled={!comentario.trim() || addComentarioMutation.isPending}
           >
             {addComentarioMutation.isPending ? (

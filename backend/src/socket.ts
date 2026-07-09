@@ -1,9 +1,9 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
-import jwt from 'jsonwebtoken';
-import { JwtPayload } from './types/index.js';
+import { supabase } from './config/supabase.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'assistencia-tecnica-secret-key';
+// Autentica a conexao do socket com o mesmo access_token do Supabase (GIO),
+// validado pelo proprio Supabase via getUser.
 
 let io: SocketServer | null = null;
 
@@ -23,15 +23,17 @@ export function initSocket(server: HttpServer): SocketServer {
   });
 
   // Auth middleware for socket connections
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) {
       return next(new Error('Token nao fornecido'));
     }
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-      socket.data.userId = decoded.userId;
-      socket.data.role = decoded.role;
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data.user) {
+        return next(new Error('Token invalido'));
+      }
+      socket.data.userId = data.user.id;
       next();
     } catch {
       next(new Error('Token invalido'));

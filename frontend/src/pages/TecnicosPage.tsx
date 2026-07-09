@@ -171,20 +171,14 @@ export default function TecnicosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{isAdmin() ? 'Usuarios' : 'Tecnicos'}</h1>
-          <p className="text-muted-foreground">
-            {isAdmin() ? 'Gerencie todos os usuarios do sistema' : 'Lista de tecnicos disponiveis'}
-          </p>
-        </div>
-        {isAdmin() && (
+      {isAdmin() && (
+        <div className="flex justify-end">
           <Button onClick={() => handleOpen()}>
             <Plus className="mr-2 h-4 w-4" />
             Novo Usuario
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex h-64 items-center justify-center">

@@ -105,11 +105,7 @@ export default function AgendaTecnicaPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Agenda Técnica</h1>
-          <p className="text-muted-foreground">Gerencie agendamentos e roteiros de atendimento</p>
-        </div>
+      <div className="flex justify-end">
         <Button onClick={() => setDataSelecionada(new Date())}>
           <Calendar className="h-4 w-4 mr-2" />
           Hoje

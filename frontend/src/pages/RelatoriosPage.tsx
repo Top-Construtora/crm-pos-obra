@@ -55,13 +55,6 @@ export default function RelatoriosPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Relatórios e KPIs</h1>
-        <p className="text-muted-foreground">
-          Indicadores de desempenho e análises detalhadas
-        </p>
-      </div>
-
       {/* KPIs principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>

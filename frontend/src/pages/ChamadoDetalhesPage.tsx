@@ -33,9 +33,7 @@ import {
 } from '@/components/ui/select'
 import {
   STATUS_LABELS,
-  CATEGORIA_LABELS,
   PRIORIDADE_LABELS,
-  TIPO_LABELS,
 } from '@/types'
 
 export default function ChamadoDetalhesPage() {
@@ -136,24 +134,15 @@ export default function ChamadoDetalhesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">Chamado #{chamado.numero}</h1>
-              <Badge variant={getPrioridadeColor(chamado.prioridade)}>
-                {PRIORIDADE_LABELS[chamado.prioridade as keyof typeof PRIORIDADE_LABELS]}
-              </Badge>
-            </div>
-            <p className="text-muted-foreground">
-              {CATEGORIA_LABELS[chamado.categoria as keyof typeof CATEGORIA_LABELS]} -{' '}
-              {TIPO_LABELS[chamado.tipo as keyof typeof TIPO_LABELS]}
-            </p>
-          </div>
+          <Badge variant={getPrioridadeColor(chamado.prioridade)}>
+            {PRIORIDADE_LABELS[chamado.prioridade as keyof typeof PRIORIDADE_LABELS]}
+          </Badge>
         </div>
         {canEditChamado() && (
           <Button asChild>

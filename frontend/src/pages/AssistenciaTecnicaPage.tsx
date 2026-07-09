@@ -32,12 +32,8 @@ import {
   Download,
   Building2,
   Tag,
-  Ticket,
   Clock,
-  AlertCircle,
   CheckCircle,
-  HourglassIcon,
-  ArrowUp,
   MapPin,
   GripVertical,
   FileText,
@@ -45,7 +41,6 @@ import {
 } from 'lucide-react'
 import { chamadosService } from '@/services/chamados.service'
 import { empreendimentosService } from '@/services/empreendimentos.service'
-import { dashboardService } from '@/services/dashboard.service'
 import { exportChamadosListPDF, exportChamadosExcel } from '@/lib/export'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -80,46 +75,6 @@ const COLUMNS: { id: ChamadoStatus; title: string; dotClass: string }[] = [
 ]
 
 // ============ STAT CARD ============
-interface StatCardProps {
-  icon: React.ReactNode
-  iconClass: string
-  value: number
-  label: string
-  trend?: { value: string; up: boolean }
-  highlight?: boolean
-}
-
-function StatCard({ icon, iconClass, value, label, trend, highlight }: StatCardProps) {
-  return (
-    <div className={cn(
-      'flex-1 min-w-[180px] rounded-xl p-5 border transition-all hover:-translate-y-0.5 hover:shadow-md',
-      highlight
-        ? 'stat-highlight text-white border-transparent'
-        : 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border-border'
-    )}>
-      <div className={cn(
-        'w-11 h-11 rounded-lg flex items-center justify-center mb-3 text-lg',
-        highlight ? 'bg-white/15' : iconClass
-      )}>
-        {icon}
-      </div>
-      <div className="text-3xl font-bold mb-1">{value}</div>
-      <div className={cn('text-xs font-medium', highlight ? 'text-white/70' : 'text-muted-foreground')}>
-        {label}
-      </div>
-      {trend && (
-        <div className={cn(
-          'inline-flex items-center gap-1 text-xs font-semibold mt-2 px-2 py-0.5 rounded',
-          trend.up ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700'
-        )}>
-          <ArrowUp className={cn('h-3 w-3', !trend.up && 'rotate-180')} />
-          {trend.value}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ============ KANBAN CARD ============
 interface KanbanCardProps {
   chamado: Chamado & { slaInfo?: any }
@@ -284,7 +239,7 @@ function KanbanColumn({ column, chamados, onAddClick, onCardClick }: KanbanColum
     <div
       ref={setNodeRef}
       className={cn(
-        'flex flex-col min-w-[340px] max-w-[340px] bg-slate-50 dark:bg-slate-900/50 rounded-xl border max-h-full transition-all duration-200',
+        'flex flex-col min-w-[340px] max-w-[340px] bg-muted/40 dark:bg-white/[0.04] rounded-xl border max-h-full transition-all duration-200',
         isOver && 'border-primary/50 bg-primary/5 dark:bg-primary/10 ring-1 ring-primary/20'
       )}
     >
@@ -507,11 +462,6 @@ export default function AssistenciaTecnicaPage() {
   }
 
   // Queries
-  const { data: stats } = useQuery({
-    queryKey: ['dashboard', 'stats'],
-    queryFn: dashboardService.getStats,
-  })
-
   const { data: kanbanData, isLoading } = useQuery({
     queryKey: ['chamados', 'kanban', filters],
     queryFn: () => chamadosService.getKanban(filters),
@@ -608,42 +558,6 @@ export default function AssistenciaTecnicaPage() {
 
   return (
     <div className="space-y-0">
-      {/* Dashboard Strip */}
-      <div className="flex gap-4 p-5 bg-card border-b overflow-x-auto -mx-4 lg:-mx-6 px-4 lg:px-6">
-        <StatCard
-          icon={<Ticket className="h-5 w-5" />}
-          iconClass=""
-          value={stats?.total || 0}
-          label="Total de Chamados"
-          highlight
-        />
-        <StatCard
-          icon={<AlertCircle className="h-5 w-5" />}
-          iconClass="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
-          value={stats?.abertos || 0}
-          label="Em Aberto"
-        />
-        <StatCard
-          icon={<Clock className="h-5 w-5" />}
-          iconClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-          value={stats?.emAndamento || 0}
-          label="Em Andamento"
-        />
-        <StatCard
-          icon={<HourglassIcon className="h-5 w-5" />}
-          iconClass="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-          value={stats?.aguardando || 0}
-          label="Aguardando"
-        />
-        <StatCard
-          icon={<CheckCircle className="h-5 w-5" />}
-          iconClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-          value={stats?.finalizados || 0}
-          label="Finalizados"
-          trend={{ value: `${stats?.total ? Math.round((stats.finalizados / stats.total) * 100) : 0}% resolução`, up: true }}
-        />
-      </div>
-
       {/* Filters Bar */}
       <div className="flex items-center gap-3 p-4 bg-card border-b flex-wrap -mx-4 lg:-mx-6 px-4 lg:px-6">
         {/* Search */}
@@ -743,7 +657,7 @@ export default function AssistenciaTecnicaPage() {
         </DropdownMenu>
 
         {canCreateChamado() && (
-          <Button className="btn-gradient" onClick={() => handleOpenModal()}>
+          <Button onClick={() => handleOpenModal()}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Chamado
           </Button>

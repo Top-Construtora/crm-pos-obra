@@ -2,89 +2,97 @@ import { Router, Response } from 'express';
 import { supabase } from '../config/supabase.js';
 import { authMiddleware, requireRoles } from '../middlewares/auth.middleware.js';
 import { upload, UPLOAD_DIR } from '../middlewares/upload.middleware.js';
-import { AuthRequest, ChamadoStatus } from '../types/index.js';
+import { AuthRequest } from '../types/index.js';
 import { calcularSLA } from '../utils/sla.js';
 import { criarNotificacao } from '../utils/notificacao.js';
 import { getIO } from '../socket.js';
-import { toCamel, sanitizeUser } from '../utils/db.js';
+import { toCamel } from '../utils/db.js';
+import { nomesDeProfiles, pessoaDe } from '../utils/pessoas.js';
 import { obrasSupabaseService } from '../services/obrasSupabase.service.js';
 import fs from 'fs';
 import path from 'path';
 
-// Sincroniza empreendimento do GIO para a tabela local (upsert)
-async function syncEmpreendimento(empreendimentoId: string): Promise<void> {
-  // Check if already exists locally
-  const { data: local } = await supabase
-    .from('empreendimentos')
-    .select('id')
-    .eq('id', empreendimentoId)
-    .single();
+const router = Router();
 
-  if (local) return; // Already synced
+// ---- Hidratacao (sem FK cross-schema: nomes vem de profiles/obras) ---------
 
-  // Fetch from GIO
-  const obra = await obrasSupabaseService.buscarObraPorId(empreendimentoId);
-  if (!obra) return;
+function empreendimentoDe(c: any) {
+  if (!c.empreendimentoId) return null;
+  return { id: c.empreendimentoId, nome: c.empreendimentoNome || null };
+}
 
-  await supabase.from('empreendimentos').upsert({
-    id: obra.id,
-    nome: obra.nome_limpo || obra.nome,
-    endereco: obra.endereco || '',
-    ativo: obra.ativo !== false,
+// Anexa responsavel/criadoPor/empreendimento a uma lista de chamados (camel),
+// com uma unica consulta de nomes em profiles.
+async function anexarPessoasChamados(chamados: any[]): Promise<void> {
+  const nomes = await nomesDeProfiles(chamados.flatMap((c) => [c.responsavelId, c.criadoPorId]));
+  chamados.forEach((c) => {
+    c.responsavel = pessoaDe(c.responsavelId, nomes);
+    c.criadoPor = pessoaDe(c.criadoPorId, nomes);
+    c.empreendimento = empreendimentoDe(c);
   });
 }
 
-const router = Router();
+// Nome da obra (obras_top) para denormalizar no chamado.
+async function nomeDaObra(empreendimentoId: string): Promise<string | null> {
+  const obra = await obrasSupabaseService.buscarObraPorId(empreendimentoId);
+  if (!obra) return null;
+  return obra.nome_limpo || obra.nome || null;
+}
 
-// Helper: buscar chamado com relacoes
+// Busca um chamado com relacoes (filhas em consultas separadas).
 async function getChamadoWithRelations(id: string, relations: string[] = []) {
-  let select = '*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*), criadoPor:users!criado_por_id(*)';
-
-  if (relations.includes('historico')) {
-    select += ', historico:historicos(*, usuario:users(*))';
-  }
-  if (relations.includes('comentarios')) {
-    select += ', comentarios(*, usuario:users(*))';
-  }
-  if (relations.includes('vistoria')) {
-    select += ', vistoria:vistorias(*)';
-  }
-  if (relations.includes('materiais')) {
-    select += ', materiais(*)';
-  }
-  if (relations.includes('anexos')) {
-    select += ', anexos(*, usuario:users(*))';
-  }
-
-  const { data, error } = await supabase
-    .from('chamados')
-    .select(select)
-    .eq('id', id)
-    .single();
-
+  const { data, error } = await supabase.from('chamados').select('*').eq('id', id).single();
   if (error || !data) return null;
 
   const chamado = toCamel(data);
-  // Sanitize user fields
-  if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
-  if (chamado.criadoPor) chamado.criadoPor = sanitizeUser(chamado.criadoPor);
-  if (chamado.historico) {
-    chamado.historico = chamado.historico.map((h: any) => {
-      if (h.usuario) h.usuario = sanitizeUser(h.usuario);
-      return h;
-    });
+
+  const [hist, coments, vist, mats, anexs] = await Promise.all([
+    relations.includes('historico')
+      ? supabase.from('historicos').select('*').eq('chamado_id', id).order('criado_em', { ascending: false })
+      : Promise.resolve({ data: null }),
+    relations.includes('comentarios')
+      ? supabase.from('comentarios').select('*').eq('chamado_id', id).order('criado_em', { ascending: false })
+      : Promise.resolve({ data: null }),
+    relations.includes('vistoria')
+      ? supabase.from('vistorias').select('*').eq('chamado_id', id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    relations.includes('materiais')
+      ? supabase.from('materiais').select('*').eq('chamado_id', id).order('criado_em', { ascending: true })
+      : Promise.resolve({ data: null }),
+    relations.includes('anexos')
+      ? supabase.from('anexos').select('*').eq('chamado_id', id).order('criado_em', { ascending: false })
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const historico = (hist.data || []).map(toCamel);
+  const comentarios = (coments.data || []).map(toCamel);
+  const materiais = (mats.data || []).map(toCamel);
+  const anexos = (anexs.data || []).map(toCamel);
+  const vistoria = vist.data ? toCamel(vist.data) : null;
+
+  // Resolve nomes de todas as pessoas envolvidas de uma vez.
+  const ids = [
+    chamado.responsavelId, chamado.criadoPorId,
+    ...historico.map((h: any) => h.usuarioId),
+    ...comentarios.map((c: any) => c.usuarioId),
+    ...anexos.map((a: any) => a.usuarioId),
+  ];
+  const nomes = await nomesDeProfiles(ids);
+
+  chamado.responsavel = pessoaDe(chamado.responsavelId, nomes);
+  chamado.criadoPor = pessoaDe(chamado.criadoPorId, nomes);
+  chamado.empreendimento = empreendimentoDe(chamado);
+
+  if (relations.includes('historico')) {
+    chamado.historico = historico.map((h: any) => ({ ...h, usuario: pessoaDe(h.usuarioId, nomes) }));
   }
-  if (chamado.comentarios) {
-    chamado.comentarios = chamado.comentarios.map((c: any) => {
-      if (c.usuario) c.usuario = sanitizeUser(c.usuario);
-      return c;
-    });
+  if (relations.includes('comentarios')) {
+    chamado.comentarios = comentarios.map((c: any) => ({ ...c, usuario: pessoaDe(c.usuarioId, nomes) }));
   }
-  if (chamado.anexos) {
-    chamado.anexos = chamado.anexos.map((a: any) => {
-      if (a.usuario) a.usuario = sanitizeUser(a.usuario);
-      return a;
-    });
+  if (relations.includes('vistoria')) chamado.vistoria = vistoria;
+  if (relations.includes('materiais')) chamado.materiais = materiais;
+  if (relations.includes('anexos')) {
+    chamado.anexos = anexos.map((a: any) => ({ ...a, usuario: pessoaDe(a.usuarioId, nomes) }));
   }
 
   return chamado;
@@ -101,7 +109,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('chamados')
-      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*), criadoPor:users!criado_por_id(*)', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('criado_em', { ascending: false });
 
     if (user.role === 'TECNICO') {
@@ -133,15 +141,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const { data: chamados, error, count } = await query;
     if (error) throw error;
 
-    let chamadosComSLA = (chamados || []).map((c) => {
-      const chamado = toCamel(c);
-      if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
-      if (chamado.criadoPor) chamado.criadoPor = sanitizeUser(chamado.criadoPor);
-      return { ...chamado, slaInfo: calcularSLA(chamado) };
-    });
+    const lista = (chamados || []).map(toCamel);
+    await anexarPessoasChamados(lista);
+    let chamadosComSLA = lista.map((chamado: any) => ({ ...chamado, slaInfo: calcularSLA(chamado) }));
 
     if (slaStatus) {
-      chamadosComSLA = chamadosComSLA.filter((c) => {
+      chamadosComSLA = chamadosComSLA.filter((c: any) => {
         if (slaStatus === 'VENCIDO') return c.slaInfo.status === 'VENCIDO';
         if (slaStatus === 'PROXIMO') return c.slaInfo.status === 'PROXIMO_VENCIMENTO';
         if (slaStatus === 'OK') return c.slaInfo.status === 'NO_PRAZO';
@@ -165,7 +170,7 @@ router.get('/kanban', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('chamados')
-      .select('*, empreendimento:empreendimentos(*), responsavel:users!responsavel_id(*)')
+      .select('*')
       .order('criado_em', { ascending: true });
 
     if (user.role === 'TECNICO') {
@@ -178,16 +183,13 @@ router.get('/kanban', async (req: AuthRequest, res: Response) => {
     const { data: chamados, error } = await query;
     if (error) throw error;
 
-    const kanban: Record<string, any[]> = {
-      ABERTO: [],
-      EM_ANDAMENTO: [],
-      AGUARDANDO: [],
-      FINALIZADO: [],
-    };
+    const lista = (chamados || []).map(toCamel);
+    await anexarPessoasChamados(lista);
 
-    (chamados || []).forEach((c) => {
-      const chamado = toCamel(c);
-      if (chamado.responsavel) chamado.responsavel = sanitizeUser(chamado.responsavel);
+    const kanban: Record<string, any[]> = {
+      ABERTO: [], EM_ANDAMENTO: [], AGUARDANDO: [], FINALIZADO: [],
+    };
+    lista.forEach((chamado: any) => {
       const chamadoComSLA = { ...chamado, slaInfo: calcularSLA(chamado) };
       kanban[chamado.status]?.push(chamadoComSLA);
     });
@@ -235,9 +237,6 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Campos obrigatorios nao preenchidos' });
     }
 
-    // Sync empreendimento from GIO to local table
-    await syncEmpreendimento(empreendimentoId);
-
     // Get next numero
     const { data: ultimo } = await supabase
       .from('chamados')
@@ -253,6 +252,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       .insert({
         numero: novoNumero,
         empreendimento_id: empreendimentoId,
+        empreendimento_nome: await nomeDaObra(empreendimentoId),
         unidade,
         cliente_nome: clienteNome,
         cliente_telefone: clienteTelefone,
@@ -318,7 +318,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
     const { data: chamadoRaw, error: fetchError } = await supabase
       .from('chamados')
-      .select('*, responsavel:users!responsavel_id(*)')
+      .select('*')
       .eq('id', req.params.id)
       .single();
 
@@ -360,7 +360,9 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       const alteracoes: string[] = [];
 
       if (empreendimentoId && empreendimentoId !== chamado.empreendimentoId) {
-        updates.empreendimento_id = empreendimentoId; alteracoes.push('empreendimento');
+        updates.empreendimento_id = empreendimentoId;
+        updates.empreendimento_nome = await nomeDaObra(empreendimentoId);
+        alteracoes.push('empreendimento');
       }
       if (unidade && unidade !== chamado.unidade) {
         updates.unidade = unidade; alteracoes.push('unidade');
@@ -601,7 +603,7 @@ router.post('/:id/comentarios', async (req: AuthRequest, res: Response) => {
         texto,
         usuario_id: user.id,
       })
-      .select('*, usuario:users(*)')
+      .select()
       .single();
 
     if (error) throw error;
@@ -628,7 +630,7 @@ router.post('/:id/comentarios', async (req: AuthRequest, res: Response) => {
     }
 
     const result = toCamel(comentario);
-    if (result.usuario) result.usuario = sanitizeUser(result.usuario);
+    result.usuario = { id: user.id, nome: user.nome };
 
     res.status(201).json(result);
   } catch (error) {
@@ -658,17 +660,15 @@ router.get('/:id/comentarios', async (req: AuthRequest, res: Response) => {
 
     const { data: comentarios, error } = await supabase
       .from('comentarios')
-      .select('*, usuario:users(*)')
+      .select('*')
       .eq('chamado_id', req.params.id)
       .order('criado_em', { ascending: false });
 
     if (error) throw error;
 
-    const result = (comentarios || []).map((c) => {
-      const com = toCamel(c);
-      if (com.usuario) com.usuario = sanitizeUser(com.usuario);
-      return com;
-    });
+    const lista = (comentarios || []).map(toCamel);
+    const nomes = await nomesDeProfiles(lista.map((c: any) => c.usuarioId));
+    const result = lista.map((c: any) => ({ ...c, usuario: pessoaDe(c.usuarioId, nomes) }));
 
     res.json(result);
   } catch (error) {
@@ -969,17 +969,15 @@ router.get('/:id/anexos', async (req: AuthRequest, res: Response) => {
   try {
     const { data: anexos, error } = await supabase
       .from('anexos')
-      .select('*, usuario:users(*)')
+      .select('*')
       .eq('chamado_id', req.params.id)
       .order('criado_em', { ascending: false });
 
     if (error) throw error;
 
-    const result = (anexos || []).map((a) => {
-      const anexo = toCamel(a);
-      if (anexo.usuario) anexo.usuario = sanitizeUser(anexo.usuario);
-      return anexo;
-    });
+    const lista = (anexos || []).map(toCamel);
+    const nomes = await nomesDeProfiles(lista.map((a: any) => a.usuarioId));
+    const result = lista.map((a: any) => ({ ...a, usuario: pessoaDe(a.usuarioId, nomes) }));
 
     res.json(result);
   } catch (error) {
@@ -1016,7 +1014,7 @@ router.post('/:id/anexos', upload.single('arquivo'), async (req: AuthRequest, re
         tipo: file.mimetype,
         usuario_id: req.user!.id,
       })
-      .select('*, usuario:users(*)')
+      .select()
       .single();
 
     if (error) throw error;
@@ -1029,7 +1027,7 @@ router.post('/:id/anexos', upload.single('arquivo'), async (req: AuthRequest, re
     });
 
     const result = toCamel(anexo);
-    if (result.usuario) result.usuario = sanitizeUser(result.usuario);
+    result.usuario = { id: req.user!.id, nome: req.user!.nome };
 
     res.status(201).json(result);
   } catch (error) {

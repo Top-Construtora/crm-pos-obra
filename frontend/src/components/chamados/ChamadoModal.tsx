@@ -314,9 +314,9 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
       {/* Modal */}
       <div className="relative bg-card w-[1000px] max-w-[95vw] max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b bg-gradient-to-r from-muted/50 to-muted/30 flex items-start justify-between">
+        <div className="px-6 py-5 border-b bg-card flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
               <Ticket className="h-5 w-5 text-sidebar-accent" />
               {isEditing ? `Protocolo #${chamado?.numero} - ${chamado?.empreendimento?.nome}` : 'Novo Chamado'}
             </h2>
@@ -401,7 +401,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                       <FileText className="h-4 w-4 text-sidebar-accent" />
                       Descrição do Problema
                     </h3>
-                    <div className="bg-gradient-to-br from-muted/30 to-muted/10 rounded-lg p-4 border">
+                    <div className="bg-muted/40 rounded-lg p-4 border">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-sm font-semibold text-foreground">Relato do Cliente</span>
                         {(isEditing && chamado) ? (
@@ -566,8 +566,8 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                     {/* Avatar and Name */}
                     <div className="text-center mb-5">
                       <div
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white mx-auto mb-3"
-                        style={{ background: 'linear-gradient(135deg, hsl(var(--sidebar-accent)), hsl(174, 82%, 28%))' }}
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-[#1A1A1A] mx-auto mb-3"
+                        style={{ background: 'linear-gradient(135deg, #A9BE2E, #D2FF00)' }}
                       >
                         {getInitials(watch('clienteNome'))}
                       </div>
@@ -750,7 +750,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
               )}
               <Button
                 type="submit"
-                className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-white"
+                className="bg-sidebar-accent hover:bg-sidebar-accent/90 text-[#1A1A1A]"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
                 <Check className="h-4 w-4 mr-2" />
