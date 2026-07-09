@@ -16,9 +16,9 @@
 --
 -- PASSOS MANUAIS OBRIGATORIOS (uma vez, no fim):
 --   1) Project Settings > API > "Exposed schemas": adicione "pos_obra".
---   2) Crie as permissoes acesso_pos_obra e gerenciar_pos_obra no sistema de
---      permissoes da GIO e atribua aos cargos que devem usar o modulo.
---      (o backend autoriza via public.gio_has_access(...)).
+--   2) Atribua a permissao acesso_pos_obra (GIO) a quem deve ENTRAR no modulo.
+--      O papel Gestor/Tecnico e definido dentro do Pos-Obra (Equipe Tecnica ->
+--      pos_obra.membros); admin GIO e gestor automatico.
 -- =============================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

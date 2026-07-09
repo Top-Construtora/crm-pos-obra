@@ -22,7 +22,6 @@ interface ProfileRow {
 }
 
 const PERM_ACESSO = 'acesso_pos_obra';
-const PERM_GERENCIAR = 'gerenciar_pos_obra';
 
 function requireAdmin() {
   if (!supabaseGioAdmin) {
@@ -76,9 +75,10 @@ export async function definirPapel(profileId: string, papel: PapelEquipe): Promi
 }
 
 /**
- * Resolucao de autorizacao do usuario logado (usada pelo middleware):
- * admin GIO = gestor sempre; gerenciar_pos_obra (GIO) tambem concede gestao
- * (fallback/bootstrap); senao vale o papel salvo em membros.
+ * Resolucao de autorizacao do usuario logado (usada pelo middleware).
+ * Fonte UNICA de papel: pos_obra.membros (GESTOR/TECNICO); admin GIO e gestor
+ * automatico (bootstrap: um admin promove o primeiro gestor). A GIO concede
+ * apenas a entrada (acesso_pos_obra).
  */
 export async function resolverAutorizacao(userId: string): Promise<{
   nome: string | null;
@@ -103,7 +103,7 @@ export async function resolverAutorizacao(userId: string): Promise<{
   const perms = permsDoProfile(profile, defaults);
   const temAcesso = isAdminGio || perms.has(PERM_ACESSO);
 
-  let podeGerenciar = isAdminGio || perms.has(PERM_GERENCIAR);
+  let podeGerenciar = isAdminGio;
   if (!podeGerenciar && temAcesso) {
     podeGerenciar = (await papelDoMembro(userId)) === 'GESTOR';
   }

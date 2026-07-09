@@ -26,7 +26,7 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
-  // true quando o usuario tem a permissao gerenciar_pos_obra na GIO.
+  // true quando o usuario e gestor: admin GIO ou papel GESTOR na Equipe Tecnica.
   podeGerenciar?: boolean;
   ativo: boolean;
   criadoEm?: string;

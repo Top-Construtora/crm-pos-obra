@@ -6,34 +6,18 @@ import { resolverAutorizacao } from '../services/equipe.service.js';
 
 // Autenticacao via Supabase Auth da GIO: o frontend loga com o Supabase e envia
 // o access_token; aqui validamos o token com supabase.auth.getUser (o proprio
-// Supabase confirma a autenticidade). A autorizacao segue o modelo
-// "GIO libera, Pos-Obra define": acesso_pos_obra (GIO) permite entrar; o papel
-// (GESTOR/TECNICO) vem de pos_obra.membros; admin GIO e gestor sempre.
+// Supabase confirma a autenticidade). Autorizacao — fonte unica de papel:
+// acesso_pos_obra (GIO) permite entrar; o papel (GESTOR/TECNICO) vem de
+// pos_obra.membros; admin GIO e gestor automatico.
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
-// Papeis GIO que sempre entram (alem de quem tiver a permissao granular).
-const ROLES_ACESSO = ['admin'];
-
-// Client no contexto do usuario (carrega o token) para que auth.uid() resolva
-// dentro de gio_has_access e das policies (usado no fallback sem service key).
+// Client so para validar o token do usuario (auth.getUser).
 function clientDoUsuario(token: string) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-}
-
-async function temPermissao(client: ReturnType<typeof clientDoUsuario>, perm: string): Promise<boolean> {
-  const { data, error } = await client.rpc('gio_has_access', {
-    allowed_roles: ROLES_ACESSO,
-    allowed_perms: [perm],
-  });
-  if (error) {
-    console.error(`Erro em gio_has_access(${perm}):`, error.message);
-    return false;
-  }
-  return data === true;
 }
 
 export const authMiddleware = async (
@@ -42,6 +26,12 @@ export const authMiddleware = async (
   next: NextFunction
 ) => {
   try {
+    // SUPABASE_SERVICE_KEY e obrigatoria: sem ela nao ha acesso aos dados do
+    // pos_obra (grants de anon revogados) nem resolucao de perfil/papel.
+    if (!supabaseGioAdmin) {
+      return res.status(503).json({ error: 'Backend mal configurado: SUPABASE_SERVICE_KEY ausente' });
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       return res.status(401).json({ error: 'Token nao fornecido' });
@@ -52,10 +42,8 @@ export const authMiddleware = async (
       return res.status(401).json({ error: 'Token mal formatado' });
     }
 
-    const client = clientDoUsuario(token);
-
     // Valida o token direto no Supabase (autenticidade garantida por ele).
-    const { data: auth, error: authError } = await client.auth.getUser(token);
+    const { data: auth, error: authError } = await clientDoUsuario(token).auth.getUser(token);
     if (authError || !auth.user) {
       return res.status(401).json({ error: 'Token invalido' });
     }
@@ -63,55 +51,25 @@ export const authMiddleware = async (
     const userId = auth.user.id;
     const emailAuth = auth.user.email;
 
-    let nome: string | null = null;
-    let role: UserRole = 'TECNICO';
-    let podeGerenciar = false;
-
-    if (supabaseGioAdmin) {
-      // Caminho principal: resolve perfil + permissoes efetivas + papel da
-      // equipe com a service key (1-2 queries, roles cacheados).
-      const autz = await resolverAutorizacao(userId);
-      if (!autz) {
-        return res.status(403).json({ error: 'Perfil nao encontrado na GIO' });
-      }
-      if (!autz.ativo) {
-        return res.status(403).json({ error: 'Usuario desativado' });
-      }
-      if (!autz.temAcesso) {
-        return res.status(403).json({ error: 'Sem acesso ao modulo Pos-Obra' });
-      }
-      nome = autz.nome;
-      podeGerenciar = autz.podeGerenciar;
-      role = autz.isAdminGio ? 'ADMIN' : podeGerenciar ? 'COORDENADOR' : 'TECNICO';
-    } else {
-      // Fallback sem SUPABASE_SERVICE_KEY: autoriza via gio_has_access com o
-      // token do usuario (sem papel da equipe; nomes podem ficar vazios).
-      const { data: profile } = await client
-        .from('profiles')
-        .select('name, ativo')
-        .eq('id', userId)
-        .single();
-
-      if (profile && profile.ativo === false) {
-        return res.status(403).json({ error: 'Usuario desativado' });
-      }
-
-      const temAcesso = await temPermissao(client, 'acesso_pos_obra');
-      if (!temAcesso) {
-        return res.status(403).json({ error: 'Sem acesso ao modulo Pos-Obra' });
-      }
-
-      nome = profile?.name || null;
-      podeGerenciar = await temPermissao(client, 'gerenciar_pos_obra');
-      role = podeGerenciar ? 'COORDENADOR' : 'TECNICO';
+    const autz = await resolverAutorizacao(userId);
+    if (!autz) {
+      return res.status(403).json({ error: 'Perfil nao encontrado na GIO' });
     }
+    if (!autz.ativo) {
+      return res.status(403).json({ error: 'Usuario desativado' });
+    }
+    if (!autz.temAcesso) {
+      return res.status(403).json({ error: 'Sem acesso ao modulo Pos-Obra' });
+    }
+
+    const role: UserRole = autz.isAdminGio ? 'ADMIN' : autz.podeGerenciar ? 'COORDENADOR' : 'TECNICO';
 
     req.user = {
       id: userId,
-      nome: nome || emailAuth || 'Usuario',
+      nome: autz.nome || emailAuth || 'Usuario',
       email: emailAuth || '',
       role,
-      podeGerenciar,
+      podeGerenciar: autz.podeGerenciar,
       ativo: true,
     };
 
@@ -123,8 +81,8 @@ export const authMiddleware = async (
 };
 
 /**
- * Exige que o usuario possa gerenciar (gestor da equipe, gerenciar_pos_obra
- * na GIO ou admin GIO).
+ * Exige que o usuario possa gerenciar (gestor definido na Equipe Tecnica ou
+ * admin GIO).
  */
 export const requireGerenciar = (req: AuthRequest, res: Response, next: NextFunction) => {
   if (!req.user) {
