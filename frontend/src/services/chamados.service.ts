@@ -43,13 +43,16 @@ export const chamadosService = {
     return response.data
   },
 
-  async update(id: string, data: Partial<ChamadoInput & { status?: string }>): Promise<Chamado> {
+  async update(
+    id: string,
+    data: Partial<ChamadoInput & { status?: string; criadoEm?: string; classificacao?: string }>
+  ): Promise<Chamado> {
     const response = await api.put<Chamado>(`/chamados/${id}`, data)
     return response.data
   },
 
-  async updateStatus(id: string, status: string): Promise<void> {
-    await api.patch(`/chamados/${id}/status`, { status })
+  async updateStatus(id: string, status: string, classificacao?: string): Promise<void> {
+    await api.patch(`/chamados/${id}/status`, { status, classificacao })
   },
 
   async delete(id: string): Promise<void> {
@@ -142,6 +145,18 @@ export const chamadosService = {
     link.click()
     link.remove()
     window.URL.revokeObjectURL(url)
+  },
+
+  // Abre o anexo em nova aba (inline). PDF/imagem renderizam no navegador;
+  // demais tipos podem baixar. Reusa o endpoint autenticado de download.
+  async viewAnexo(chamadoId: string, anexoId: string): Promise<void> {
+    const response = await api.get(`/chamados/${chamadoId}/anexos/${anexoId}/download`, {
+      responseType: 'blob',
+    })
+    const contentType = response.headers['content-type'] || 'application/octet-stream'
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: contentType }))
+    window.open(url, '_blank', 'noopener,noreferrer')
+    setTimeout(() => window.URL.revokeObjectURL(url), 60_000)
   },
 
   async deleteAnexo(chamadoId: string, anexoId: string): Promise<void> {

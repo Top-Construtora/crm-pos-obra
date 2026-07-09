@@ -52,7 +52,10 @@ CREATE TABLE IF NOT EXISTS pos_obra.chamados (
   atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
   finalizado_em TIMESTAMPTZ,
   horas_estimadas INTEGER,
-  equipe_necessaria VARCHAR(100)
+  equipe_necessaria VARCHAR(100),
+  -- Classificacao de conclusao (obrigatoria ao finalizar): CONCLUIDO_REALIZADO,
+  -- IMPROCEDENTE_NAO_REALIZADO, IMPROCEDENTE_LIBERALIDADE.
+  classificacao VARCHAR(40)
 );
 
 -- Sequence para numero do chamado (comeca em 1001)

@@ -291,7 +291,7 @@ function ListView({ chamados }: { chamados: (Chamado & { slaInfo?: any })[] }) {
     <Card>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[860px]">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left p-4 font-semibold text-xs text-muted-foreground uppercase tracking-wide">#</th>

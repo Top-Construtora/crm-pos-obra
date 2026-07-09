@@ -353,7 +353,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       const {
         empreendimentoId, unidade, clienteNome, clienteTelefone, clienteEmail,
         tipo, categoria, descricao, prioridade, slaHoras, status, responsavelId,
-        horasEstimadas, equipeNecessaria,
+        horasEstimadas, equipeNecessaria, criadoEm, classificacao,
       } = req.body;
 
       const updates: any = {};
@@ -391,6 +391,16 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       }
       if (horasEstimadas !== undefined) updates.horas_estimadas = horasEstimadas;
       if (equipeNecessaria !== undefined) updates.equipe_necessaria = equipeNecessaria;
+
+      // Data de abertura editavel (gestor). Aceita ISO ou datetime-local.
+      if (criadoEm) {
+        const d = new Date(criadoEm);
+        if (!isNaN(d.getTime()) && d.toISOString() !== new Date(chamado.criadoEm).toISOString()) {
+          updates.criado_em = d.toISOString();
+          alteracoes.push('data de abertura');
+        }
+      }
+      if (classificacao !== undefined) updates.classificacao = classificacao || null;
 
       if (status && status !== chamado.status) {
         const statusAnterior = chamado.status;
@@ -474,7 +484,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    const { status } = req.body;
+    const { status, classificacao } = req.body;
 
     if (!status) {
       return res.status(400).json({ error: 'Status e obrigatorio' });
@@ -497,8 +507,19 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
     }
 
     const statusAnterior = chamado.status;
+
+    // Classificacao obrigatoria ao finalizar (mantem a existente se ja houver).
+    const CLASSIFICACOES = ['CONCLUIDO_REALIZADO', 'IMPROCEDENTE_NAO_REALIZADO', 'IMPROCEDENTE_LIBERALIDADE'];
+    if (status === 'FINALIZADO' && !classificacao && !chamado.classificacao) {
+      return res.status(400).json({ error: 'Informe a classificacao para finalizar o chamado' });
+    }
+    if (classificacao && !CLASSIFICACOES.includes(classificacao)) {
+      return res.status(400).json({ error: 'Classificacao invalida' });
+    }
+
     const updates: any = { status };
     if (status === 'FINALIZADO') updates.finalizado_em = new Date().toISOString();
+    if (classificacao) updates.classificacao = classificacao;
 
     await supabase.from('chamados').update(updates).eq('id', chamado.id);
 
@@ -508,7 +529,7 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
       descricao: `Status alterado de ${statusAnterior} para ${status}`,
       usuario_id: user.id,
       dados_anteriores: JSON.stringify({ status: statusAnterior }),
-      dados_novos: JSON.stringify({ status }),
+      dados_novos: JSON.stringify({ status, ...(classificacao ? { classificacao } : {}) }),
     });
 
     // Notificar criador e responsavel
@@ -1008,7 +1029,9 @@ router.post('/:id/anexos', upload.single('arquivo'), async (req: AuthRequest, re
       .from('anexos')
       .insert({
         chamado_id: chamado.id,
-        nome_original: file.originalname,
+        // multer decodifica originalname como latin1; reconverte p/ utf8 para
+        // preservar acentos (evita mojibake tipo "RELATÃRIO").
+        nome_original: Buffer.from(file.originalname, 'latin1').toString('utf8'),
         nome_arquivo: file.filename,
         tamanho: file.size,
         tipo: file.mimetype,

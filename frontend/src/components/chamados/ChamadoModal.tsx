@@ -61,9 +61,11 @@ import {
   CATEGORIA_LABELS,
   PRIORIDADE_LABELS,
   STATUS_LABELS,
+  CLASSIFICACAO_LABELS,
   Categoria,
   Prioridade,
   ChamadoStatus,
+  ClassificacaoConclusao,
 } from '@/types'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -85,6 +87,7 @@ const chamadoSchema = z.object({
   prioridade: z.enum(['BAIXA', 'MEDIA', 'ALTA', 'URGENTE']),
   slaHoras: z.number().min(1).max(720),
   responsavelId: z.string().optional(),
+  dataAbertura: z.string().optional(),
 })
 
 type ChamadoForm = z.infer<typeof chamadoSchema>
@@ -101,6 +104,8 @@ type TabType = 'detalhes' | 'vistoria' | 'materiais' | 'historico' | 'anexos'
 export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: ChamadoModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('detalhes')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false)
+  const [classificacaoSel, setClassificacaoSel] = useState<ClassificacaoConclusao | ''>('')
   const queryClient = useQueryClient()
   const isEditing = !!chamadoId
 
@@ -153,6 +158,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
         prioridade: chamado.prioridade,
         slaHoras: chamado.slaHoras,
         responsavelId: chamado.responsavelId || undefined,
+        dataAbertura: chamado.criadoEm ? format(new Date(chamado.criadoEm), "yyyy-MM-dd'T'HH:mm") : '',
       })
     } else if (!isEditing && open) {
       reset({
@@ -228,15 +234,29 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
   })
 
   const statusMutation = useMutation({
-    mutationFn: (status: string) => chamadosService.updateStatus(chamadoId!, status),
+    mutationFn: ({ status, classificacao }: { status: string; classificacao?: string }) =>
+      chamadosService.updateStatus(chamadoId!, status, classificacao),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chamados'] })
       queryClient.invalidateQueries({ queryKey: ['chamado', chamadoId] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      setShowFinalizeDialog(false)
+      setClassificacaoSel('')
       toast.success('Status atualizado!')
     },
     onError: (err) => toast.error(extractApiError(err, 'Erro ao atualizar status')),
   })
+
+  // Ao escolher FINALIZADO exige a classificacao (abre dialogo); demais status
+  // aplicam direto.
+  const handleStatusSelect = (s: ChamadoStatus) => {
+    if (s === 'FINALIZADO' && !chamado?.classificacao) {
+      setClassificacaoSel('')
+      setShowFinalizeDialog(true)
+    } else {
+      statusMutation.mutate({ status: s })
+    }
+  }
 
   const handleDuplicate = () => {
     if (!chamado) return
@@ -261,15 +281,18 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
   }
 
   const onSubmit = (data: ChamadoForm) => {
-    const payload = {
-      ...data,
+    const { dataAbertura, ...rest } = data
+    const payload: Partial<ChamadoInput & { criadoEm?: string }> = {
+      ...rest,
       clienteEmail: data.clienteEmail || undefined,
       responsavelId: data.responsavelId || undefined,
     }
     if (isEditing) {
+      // Data de abertura editavel (envia como criadoEm em ISO).
+      if (dataAbertura) payload.criadoEm = new Date(dataAbertura).toISOString()
       updateMutation.mutate(payload)
     } else {
-      createMutation.mutate(payload)
+      createMutation.mutate(payload as ChamadoInput)
     }
   }
 
@@ -327,6 +350,11 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                 {' • '}Ultimo update: {formatDistanceToNow(new Date(chamado.atualizadoEm), { addSuffix: true, locale: ptBR })}
               </p>
             )}
+            {isEditing && chamado?.classificacao && (
+              <span className="inline-block mt-1.5 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                {CLASSIFICACAO_LABELS[chamado.classificacao]}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {isEditing && chamado && (
@@ -347,7 +375,7 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                     .map((s) => (
                       <DropdownMenuItem
                         key={s}
-                        onClick={() => statusMutation.mutate(s)}
+                        onClick={() => handleStatusSelect(s)}
                       >
                         <span className={cn('w-2 h-2 rounded-full mr-2', getStatusBgColor(s))} />
                         {STATUS_LABELS[s]}
@@ -556,6 +584,18 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
                           defaultValue={format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')}
                         />
                       </div>
+                      {isEditing && (
+                        <div>
+                          <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            Data de Abertura
+                          </label>
+                          <Input
+                            type="datetime-local"
+                            {...register('dataAbertura')}
+                            className="mt-1.5"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -777,6 +817,47 @@ export function ChamadoModal({ open, onOpenChange, chamadoId, onSuccess }: Chama
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Finalizar: exige classificacao de conclusao */}
+      <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalizar chamado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione a classificacao de conclusao para finalizar o chamado #{chamado?.numero}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-1">
+            <Select
+              value={classificacaoSel || undefined}
+              onValueChange={(v) => setClassificacaoSel(v as ClassificacaoConclusao)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a classificacao..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.entries(CLASSIFICACAO_LABELS) as [ClassificacaoConclusao, string][]).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!classificacaoSel || statusMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                if (!classificacaoSel) return
+                statusMutation.mutate({ status: 'FINALIZADO', classificacao: classificacaoSel })
+              }}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Finalizar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
