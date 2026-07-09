@@ -18,7 +18,8 @@ const INVERT_TO_WHITE = 'invert(1) brightness(1.1)'
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const { login } = useAuth()
+  const [isMsLoading, setIsMsLoading] = useState(false)
+  const { login, loginWithMicrosoft } = useAuth()
 
   const {
     register,
@@ -32,6 +33,16 @@ export default function LoginPage() {
       await login(data)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const onMicrosoft = async () => {
+    setIsMsLoading(true)
+    try {
+      // Redireciona para a Microsoft; em caso de erro, reabilita o botao.
+      await loginWithMicrosoft()
+    } catch {
+      setIsMsLoading(false)
     }
   }
 
@@ -210,28 +221,34 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              {/* Usuarios de teste — apenas em desenvolvimento */}
-              {import.meta.env.DEV && (
-                <div className="mt-6 rounded-[10px] border border-white/[0.08] bg-white/[0.03] p-3.5">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8B8B95]">
-                    Usuarios de teste
-                  </p>
-                  <div className="space-y-1 text-[11.5px] text-white/60">
-                    <div className="flex justify-between gap-2">
-                      <span>Admin</span>
-                      <code className="text-white/80">admin@empresa.com / admin123</code>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <span>Coordenador</span>
-                      <code className="text-white/80">coord@empresa.com / coord123</code>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <span>Tecnico</span>
-                      <code className="text-white/80">joao@empresa.com / tecnico123</code>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Divisor */}
+              <div className="my-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/[0.09]" />
+                <span className="text-[11px] uppercase tracking-[0.1em] text-[#8B8B95]">ou</span>
+                <div className="h-px flex-1 bg-white/[0.09]" />
+              </div>
+
+              {/* Entrar com Microsoft (SSO Entra/Azure via GIO) */}
+              <button
+                type="button"
+                onClick={onMicrosoft}
+                disabled={isMsLoading}
+                className="flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[10px] border border-white/[0.12] bg-white/[0.06] text-[14.5px] font-semibold text-white outline-none transition cursor-pointer hover:border-white/20 hover:bg-white/[0.1] focus:border-[#D2FF00] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isMsLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden>
+                      <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+                      <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+                      <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+                      <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+                    </svg>
+                    Entrar com Microsoft
+                  </>
+                )}
+              </button>
 
               <div className="mt-[26px] text-center text-[11px] tracking-[0.03em] text-[#8B8B95] opacity-55">
                 © 2026 GIO · Todos os direitos reservados
