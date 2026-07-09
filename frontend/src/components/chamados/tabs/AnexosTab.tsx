@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Paperclip, Upload, Download, Trash2, FileText, Image, FileSpreadsheet, Archive, Loader2 } from 'lucide-react'
+import { Paperclip, Upload, Download, Eye, Trash2, FileText, Image, FileSpreadsheet, Archive, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { chamadosService } from '@/services/chamados.service'
 import { cn } from '@/lib/utils'
@@ -87,6 +87,7 @@ export function AnexosTab({ chamadoId }: AnexosTabProps) {
       <div className="space-y-2">
         {anexos.map((anexo) => {
           const { icon: Icon, color } = getFileIcon(anexo.tipo)
+          const canPreview = anexo.tipo.startsWith('image/') || anexo.tipo === 'application/pdf'
           return (
             <div
               key={anexo.id}
@@ -102,11 +103,24 @@ export function AnexosTab({ chamadoId }: AnexosTabProps) {
                   {format(new Date(anexo.criadoEm), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                 </p>
               </div>
+              {canPreview && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title="Visualizar"
+                  onClick={() => chamadosService.viewAnexo(chamadoId, anexo.id).catch(() => toast.error('Erro ao abrir o arquivo'))}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
+                title="Baixar"
                 onClick={() => chamadosService.downloadAnexo(chamadoId, anexo.id, anexo.nomeOriginal)}
               >
                 <Download className="h-4 w-4" />

@@ -140,6 +140,7 @@ export interface Chamado {
   criadoEm: string;
   atualizadoEm: string;
   finalizadoEm?: string;
+  classificacao?: ClassificacaoConclusao;
   historico?: Historico[];
   comentarios?: Comentario[];
   vistoria?: Vistoria;
@@ -253,6 +254,18 @@ export const STATUS_LABELS: Record<ChamadoStatus, string> = {
   EM_ANDAMENTO: 'Em Andamento',
   AGUARDANDO: 'Aguardando',
   FINALIZADO: 'Finalizado',
+};
+
+// Classificacao de conclusao (obrigatoria ao finalizar).
+export type ClassificacaoConclusao =
+  | 'CONCLUIDO_REALIZADO'
+  | 'IMPROCEDENTE_NAO_REALIZADO'
+  | 'IMPROCEDENTE_LIBERALIDADE';
+
+export const CLASSIFICACAO_LABELS: Record<ClassificacaoConclusao, string> = {
+  CONCLUIDO_REALIZADO: 'Concluído - Realizado',
+  IMPROCEDENTE_NAO_REALIZADO: 'Improcedente - Não Realizado',
+  IMPROCEDENTE_LIBERALIDADE: 'Improcedente - Liberalidade',
 };
 
 export const PRIORIDADE_LABELS: Record<Prioridade, string> = {
