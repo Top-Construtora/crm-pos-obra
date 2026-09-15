@@ -1,10 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { GIO_FONT } from '@/config/gioBrand'
+import AuthBackdrop from '@/components/auth/AuthBackdrop'
+import BlurText from '@/components/auth/BlurText'
+import RotatingText from '@/components/auth/RotatingText'
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Informe seu email').email('Formato de email invalido'),
@@ -13,13 +17,45 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
+// GIO v4.0: mesmo layout do login do Portal de Gente (avaliacao-performance-top).
+// Marca e headline à esquerda, card com o SSO Microsoft como caminho principal
+// e o email/senha recolhido; rodapé de tela inteira ancora as duas colunas.
 const INVERT_TO_WHITE = 'invert(1) brightness(1.1)'
+
+const DESTAQUES = [
+  { title: 'Chamados com SLA', desc: 'Abertura, triagem e prazos num fluxo só.' },
+  { title: 'Agenda técnica', desc: 'Visitas e equipes organizadas por empreendimento.' },
+  { title: 'Relatórios', desc: 'Indicadores de atendimento para decidir rápido.' },
+]
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
+  const [showEmailLogin, setShowEmailLogin] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isMsLoading, setIsMsLoading] = useState(false)
   const { login, loginWithMicrosoft } = useAuth()
+
+  // Telas baixas (notebook 768p): o card expandido precisa de cada pixel, então
+  // o spacer de alinhamento encolhe quase a zero e o card fica compacto.
+  const [isShortViewport, setIsShortViewport] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-height: 820px)')
+    const update = () => setIsShortViewport(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  // Em telas baixas o card expandido rola dentro da coluna: ao abrir o
+  // formulário, garante que ele apareça na vista.
+  const emailFormRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!showEmailLogin) return
+    const id = window.setTimeout(() => {
+      emailFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 350)
+    return () => window.clearTimeout(id)
+  }, [showEmailLogin])
 
   const {
     register,
@@ -51,211 +87,256 @@ export default function LoginPage() {
       className="relative min-h-screen w-full overflow-hidden bg-[#1A1A1A] text-white"
       style={{ fontFamily: GIO_FONT }}
     >
-      {/* Grade blueprint — pano de fundo técnico (lime translúcido sobre obsidian) */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 z-0"
-        style={{
-          backgroundImage: `linear-gradient(rgba(210,255,0,.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(210,255,0,.05) 1px, transparent 1px),
-            linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px)`,
-          backgroundSize: '90px 90px, 90px 90px, 22.5px 22.5px, 22.5px 22.5px',
-          maskImage: 'radial-gradient(ellipse 100% 100% at 45% 45%, black 30%, transparent 100%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 100% 100% at 45% 45%, black 30%, transparent 100%)',
-        }}
-      />
+      <AuthBackdrop />
 
-      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:h-screen lg:grid-cols-[1.05fr_0.95fr]">
-        {/* ═══ ESQUERDA — PAINEL DE MARCA ═══ */}
-        <aside className="relative hidden flex-col justify-center overflow-hidden px-16 py-16 lg:flex xl:px-24">
-          <svg
-            aria-hidden
-            className="pointer-events-none absolute inset-0 z-0 h-full w-full"
-            viewBox="0 0 780 900"
-            preserveAspectRatio="xMidYMid slice"
-            xmlns="http://www.w3.org/2000/svg"
+      {/* Overlay enquanto o redirect para a Microsoft acontece (sem tela "morta") */}
+      <AnimatePresence>
+        {isMsLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 grid place-items-center bg-[#1A1A1A]/80 backdrop-blur-sm"
           >
-            <g>
-              <line x1="0" y1="900" x2="420" y2="0" stroke="#D2FF00" strokeWidth="1" opacity=".08" />
-              <circle cx="420" cy="0" r="3.5" fill="#D2FF00" opacity=".2" />
-              <circle cx="0" cy="900" r="3.5" fill="#D2FF00" opacity=".2" />
-            </g>
-            <g>
-              <line x1="160" y1="900" x2="580" y2="0" stroke="#D2FF00" strokeWidth=".5" opacity=".05" />
-              <circle cx="580" cy="0" r="2" fill="#D2FF00" opacity=".12" />
-              <circle cx="160" cy="900" r="2" fill="#D2FF00" opacity=".12" />
-            </g>
-            <g>
-              <line x1="0" y1="260" x2="300" y2="260" stroke="#D2FF00" strokeWidth=".8" opacity=".12" />
-              <circle cx="300" cy="260" r="3" fill="#D2FF00" opacity=".25" />
-            </g>
-            <g>
-              <line x1="480" y1="640" x2="780" y2="640" stroke="#D2FF00" strokeWidth=".8" opacity=".12" />
-              <circle cx="480" cy="640" r="3" fill="#D2FF00" opacity=".25" />
-            </g>
-            <g>
-              <path d="M36 36 L36 96 L96 96" fill="none" stroke="#D2FF00" strokeWidth="1.4" opacity=".25" />
-              <circle cx="96" cy="96" r="3" fill="#D2FF00" opacity=".3" />
-            </g>
-            <g>
-              <path d="M36 864 L36 804 L96 804" fill="none" stroke="#D2FF00" strokeWidth="1.4" opacity=".25" />
-              <circle cx="96" cy="804" r="3" fill="#D2FF00" opacity=".3" />
-            </g>
-          </svg>
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-[#D2FF00]" />
+              <p className="text-[14px] text-white/70">Conectando à Microsoft…</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <div className="relative z-[1] max-w-[560px]">
-            <div className="mb-12">
-              <img
-                src="/assets/gioWordmark.png"
-                alt="GIO"
-                className="w-[240px] max-w-full"
-                style={{ filter: INVERT_TO_WHITE }}
-              />
-              <span className="mt-3 block text-[12px] font-medium uppercase tracking-[0.18em] text-white/35">
+      <div className="relative z-10 flex min-h-screen flex-col lg:h-screen">
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* ═══ ESQUERDA: PAINEL DE MARCA ═══ */}
+          <aside className="relative hidden flex-col overflow-hidden px-16 pt-14 lg:flex xl:px-24">
+            <div className="relative z-[1] w-[240px] max-w-full text-center">
+              <img src="/assets/gioWordmark.png" alt="GIO" className="w-full" style={{ filter: INVERT_TO_WHITE }} />
+              <span className="mt-3 block whitespace-nowrap text-[12px] font-medium uppercase tracking-[0.18em] text-white/35">
                 Gestão Inteligente de Obras
               </span>
             </div>
 
-            <div className="flex gap-[14px]">
-              <div className="mt-2 w-[3px] shrink-0 self-stretch rounded-full bg-gradient-to-b from-[#D2FF00] via-[#D2FF00]/40 to-transparent" />
-              <div>
-                <h1 className="mb-6 text-[48px] font-semibold leading-[1.08] tracking-[-0.035em] text-white">
-                  Assistência técnica sob controle,{' '}
-                  <em className="not-italic text-[#D2FF00]">do chamado à entrega</em>.
+            {/* Headline grande ao centro, ancorada pela linha lime */}
+            <div className="relative z-[1] flex flex-1 items-center">
+              <div className="flex gap-[18px]">
+                <div className="mt-3 w-[3px] shrink-0 self-stretch rounded-full bg-gradient-to-b from-[#D2FF00] via-[#D2FF00]/40 to-transparent" />
+                <h1 className="text-[clamp(30px,3.4vw,64px)] font-semibold leading-[1.1] tracking-[-0.035em] text-white">
+                  <BlurText text="Pós-obra sob controle," />
+                  <br />
+                  <RotatingText
+                    className="text-[#D2FF00]"
+                    items={['do chamado à entrega.', 'SLAs sempre à vista.', 'equipes em sintonia.']}
+                  />
                 </h1>
-                <p className="max-w-[460px] text-[17px] leading-[1.6] text-white/55">
-                  Chamados, SLAs e equipes técnicas em um só lugar — com a visibilidade que sua
-                  operação de pós-obra precisa para resolver rápido.
-                </p>
               </div>
             </div>
-          </div>
-        </aside>
+          </aside>
 
-        {/* ═══ DIREITA — FORMULÁRIO ═══ */}
-        <main className="relative flex items-center justify-center p-6 lg:px-16">
-          <div className="w-[430px] max-w-[calc(100%-48px)] sm:max-w-[calc(100%-80px)]">
-            <div
-              className="relative rounded-[20px] border border-white/10 bg-[rgba(0,0,0,0.18)] px-10 pb-10 pt-11 shadow-[0_32px_64px_rgba(0,0,0,0.35)]"
-              style={{
-                backdropFilter: 'blur(28px) saturate(1.4)',
-                WebkitBackdropFilter: 'blur(28px) saturate(1.4)',
-              }}
-            >
-              {/* Barra de destaque lime */}
-              <div className="absolute -top-px left-10 right-10 h-0.5 rounded-b-[4px] bg-[#D2FF00] opacity-90" />
+          {/* ═══ DIREITA: FORMULÁRIO ═══
+              No desktop, um spacer espelha o bloco da logo do painel esquerdo
+              para o card centrar no mesmo espaço vertical da headline. */}
+          <main className="relative flex flex-col p-6 lg:min-h-0 lg:overflow-y-auto lg:px-16 lg:pb-0 lg:pt-14 lg:[@media(max-height:820px)]:pt-6">
+            {/* Marca no mobile (o painel esquerdo some abaixo de lg) */}
+            <div className="mt-6 text-center lg:hidden">
+              <img
+                src="/assets/gioWordmark.png"
+                alt="GIO"
+                className="mx-auto h-[44px] w-auto"
+                style={{ filter: INVERT_TO_WHITE }}
+              />
+              <span className="mt-2 block text-[10px] font-medium uppercase tracking-[0.2em] text-white/35">
+                Gestão Inteligente de Obras
+              </span>
+            </div>
 
-              <div className="mb-7 flex flex-col items-center gap-2.5 text-center">
-                <img
-                  src="/assets/gioWordmark.png"
-                  alt="GIO"
-                  className="block h-[40px] w-auto"
-                  style={{ filter: INVERT_TO_WHITE }}
-                />
-                <span className="text-[10.5px] font-medium uppercase tracking-[0.13em] text-[#8B8B95]">
-                  Gestão Inteligente de Obras
-                </span>
-              </div>
+            <motion.div
+              aria-hidden
+              className="hidden w-full flex-shrink-0 lg:block"
+              initial={false}
+              animate={{ height: showEmailLogin ? (isShortViewport ? 8 : 40) : 202 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            />
+            <div className="flex w-full flex-1 items-center justify-center lg:min-h-0 lg:py-5 lg:[@media(max-height:820px)]:py-3">
+              <motion.div
+                initial={{ opacity: 0, y: 28, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: 'spring' as const, stiffness: 170, damping: 22 }}
+                className="w-[460px] max-w-[calc(100%-48px)] sm:max-w-[calc(100%-80px)]"
+              >
+                <div
+                  className="relative overflow-hidden rounded-[20px] border border-white/10 bg-[rgba(0,0,0,0.18)] px-10 pb-10 pt-11 shadow-[0_32px_64px_rgba(0,0,0,0.35)] lg:[@media(max-height:820px)]:px-8 lg:[@media(max-height:820px)]:pb-6 lg:[@media(max-height:820px)]:pt-7"
+                  style={{
+                    backdropFilter: 'blur(28px) saturate(1.4)',
+                    WebkitBackdropFilter: 'blur(28px) saturate(1.4)',
+                  }}
+                >
+                  {/* Barra de destaque lime (assinatura do card de autenticação) */}
+                  <div className="absolute -top-px left-10 right-10 h-0.5 rounded-b-[4px] bg-[#D2FF00] opacity-90" />
 
-              <div className="mb-[26px] h-px w-full bg-white/[0.09]" />
+                  {/* Assinatura do produto (a marca grande já vive no painel esquerdo) */}
+                  <div className="mb-7 text-center lg:[@media(max-height:820px)]:mb-4">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8B8B95]">
+                      Assistência Técnica
+                    </span>
+                  </div>
 
-              <h2 className="mb-1.5 text-center text-[22px] font-semibold tracking-[-0.03em] text-white">
-                Bem-vindo de volta
-              </h2>
-              <p className="mb-8 text-center text-[14px] text-[#8B8B95]">
-                Acesse sua conta para continuar.
-              </p>
+                  <div className="mb-[26px] h-px w-full bg-white/[0.09] lg:[@media(max-height:820px)]:mb-4" />
 
-              <form onSubmit={handleSubmit(onSubmit)}>
-                {/* E-mail */}
-                <div className="mb-4 flex flex-col gap-1.5">
-                  <label htmlFor="email" className="text-[11.5px] font-semibold uppercase tracking-[0.07em] text-[#8B8B95]">
-                    E-mail
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="seu@email.com.br"
-                    {...register('email')}
-                    className="h-12 w-full rounded-[10px] border border-white/10 bg-white/[0.06] px-4 text-[14.5px] text-white outline-none transition placeholder:text-[#8B8B95] placeholder:opacity-55 hover:border-white/[0.14] focus:border-[#D2FF00] focus:shadow-[0_0_0_3px_rgba(210,255,0,0.18)]"
-                  />
-                  {errors.email && <span className="text-[12px] text-[#ff9090]">{errors.email.message}</span>}
-                </div>
+                  <h2 className="mb-1.5 text-center text-[22px] font-semibold tracking-[-0.03em] text-white">
+                    Entre na sua conta
+                  </h2>
+                  <p className="mb-8 text-center text-[14px] text-[#8B8B95] lg:[@media(max-height:820px)]:mb-5">
+                    Use sua conta corporativa para acessar a GIO.
+                  </p>
 
-                {/* Senha */}
-                <div className="mb-6 flex flex-col gap-1.5">
-                  <label htmlFor="senha" className="text-[11.5px] font-semibold uppercase tracking-[0.07em] text-[#8B8B95]">
-                    Senha
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="senha"
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete="current-password"
-                      placeholder="••••••••"
-                      {...register('senha')}
-                      className="h-12 w-full rounded-[10px] border border-white/10 bg-white/[0.06] pl-4 pr-12 text-[14.5px] text-white outline-none transition placeholder:text-[#8B8B95] placeholder:opacity-55 hover:border-white/[0.14] focus:border-[#D2FF00] focus:shadow-[0_0_0_3px_rgba(210,255,0,0.18)]"
-                    />
+                  {/* Botão principal: login com Microsoft (SSO Entra/Azure via GIO) */}
+                  <button
+                    type="button"
+                    onClick={onMicrosoft}
+                    disabled={isLoading || isMsLoading}
+                    className="group relative flex h-[52px] w-full cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-[10px] border border-white/[0.14] bg-white/[0.08] text-[14.5px] font-semibold text-white shadow-[0_2px_12px_rgba(0,0,0,0.25)] transition hover:border-[#D2FF00]/40 hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D2FF00]/50 disabled:cursor-not-allowed disabled:opacity-60 lg:[@media(max-height:820px)]:h-[46px]"
+                  >
+                    {isMsLoading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Conectando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-5 w-5" viewBox="0 0 21 21" aria-hidden>
+                          <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+                          <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+                          <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+                          <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+                        </svg>
+                        <span>Entrar com Microsoft</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Login alternativo fica recolhido: o Microsoft é o caminho oficial */}
+                  <div className="mt-4 text-center">
                     <button
                       type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-1 text-[#8B8B95] opacity-70 transition hover:opacity-100"
-                      tabIndex={-1}
+                      onClick={() => setShowEmailLogin((v) => !v)}
+                      aria-expanded={showEmailLogin}
+                      className="cursor-pointer rounded border-0 bg-transparent px-1 text-[13px] text-[#8B8B95] transition-colors hover:text-[#D2FF00] focus-visible:text-[#D2FF00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D2FF00]/50"
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showEmailLogin ? 'Ocultar login com email' : 'Entrar com email e senha'}
                     </button>
                   </div>
-                  {errors.senha && <span className="text-[12px] text-[#ff9090]">{errors.senha.message}</span>}
+
+                  <AnimatePresence>
+                    {showEmailLogin && (
+                      <motion.div
+                        ref={emailFormRef}
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-5 border-t border-white/[0.09] pt-5 lg:[@media(max-height:820px)]:mt-4 lg:[@media(max-height:820px)]:pt-4">
+                          <form onSubmit={handleSubmit(onSubmit)}>
+                            {/* E-mail */}
+                            <div className="mb-4 flex flex-col gap-1.5">
+                              <label
+                                htmlFor="email"
+                                className="text-[11.5px] font-semibold uppercase tracking-[0.07em] text-[#8B8B95]"
+                              >
+                                E-mail
+                              </label>
+                              <input
+                                id="email"
+                                type="email"
+                                autoComplete="email"
+                                placeholder="seu@email.com.br"
+                                disabled={isLoading}
+                                {...register('email')}
+                                className="h-12 w-full rounded-[10px] border border-white/10 bg-white/[0.06] px-4 text-[14.5px] text-white outline-none transition placeholder:text-[#8B8B95] placeholder:opacity-55 hover:border-white/[0.14] focus:border-[#D2FF00] focus:shadow-[0_0_0_3px_rgba(210,255,0,0.18)] lg:[@media(max-height:820px)]:h-11"
+                              />
+                              {errors.email && <span className="text-[12px] text-[#ff9090]">{errors.email.message}</span>}
+                            </div>
+
+                            {/* Senha */}
+                            <div className="mb-6 flex flex-col gap-1.5 lg:[@media(max-height:820px)]:mb-4">
+                              <label
+                                htmlFor="senha"
+                                className="text-[11.5px] font-semibold uppercase tracking-[0.07em] text-[#8B8B95]"
+                              >
+                                Senha
+                              </label>
+                              <div className="relative">
+                                <input
+                                  id="senha"
+                                  type={showPassword ? 'text' : 'password'}
+                                  autoComplete="current-password"
+                                  placeholder="••••••••"
+                                  disabled={isLoading}
+                                  {...register('senha')}
+                                  className="h-12 w-full rounded-[10px] border border-white/10 bg-white/[0.06] pl-4 pr-12 text-[14.5px] text-white outline-none transition placeholder:text-[#8B8B95] placeholder:opacity-55 hover:border-white/[0.14] focus:border-[#D2FF00] focus:shadow-[0_0_0_3px_rgba(210,255,0,0.18)] lg:[@media(max-height:820px)]:h-11"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPassword((v) => !v)}
+                                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-1 text-[#8B8B95] opacity-70 transition hover:opacity-100"
+                                  tabIndex={-1}
+                                >
+                                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                              </div>
+                              {errors.senha && <span className="text-[12px] text-[#ff9090]">{errors.senha.message}</span>}
+                            </div>
+
+                            {/* Entrar: CTA primário em lime */}
+                            <button
+                              type="submit"
+                              disabled={isLoading || isMsLoading}
+                              className="relative flex h-[50px] w-full cursor-pointer items-center justify-center rounded-[10px] bg-[#D2FF00] text-[15px] font-bold tracking-[0.02em] text-[#1A1A1A] shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition hover:-translate-y-px hover:bg-[#C2EE00] hover:shadow-[0_6px_20px_rgba(0,0,0,0.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 lg:[@media(max-height:820px)]:h-[46px]"
+                            >
+                              {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Entrar'}
+                            </button>
+                          </form>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* No desktop o © vive no rodapé de tela inteira; aqui só no mobile */}
+                  <div className="mt-[26px] text-center text-[11px] tracking-[0.03em] text-[#8B8B95] opacity-55 lg:hidden">
+                    © 2026 GIO · Sistema protegido por autenticação segura
+                  </div>
                 </div>
-
-                {/* Entrar — CTA primário em lime */}
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="relative flex h-[50px] w-full items-center justify-center rounded-[10px] bg-[#D2FF00] text-[15px] font-bold tracking-[0.02em] text-[#1A1A1A] shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition cursor-pointer hover:-translate-y-px hover:bg-[#C2EE00] hover:shadow-[0_6px_20px_rgba(0,0,0,0.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
-                >
-                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Entrar'}
-                </button>
-              </form>
-
-              {/* Divisor */}
-              <div className="my-6 flex items-center gap-3">
-                <div className="h-px flex-1 bg-white/[0.09]" />
-                <span className="text-[11px] uppercase tracking-[0.1em] text-[#8B8B95]">ou</span>
-                <div className="h-px flex-1 bg-white/[0.09]" />
-              </div>
-
-              {/* Entrar com Microsoft (SSO Entra/Azure via GIO) */}
-              <button
-                type="button"
-                onClick={onMicrosoft}
-                disabled={isMsLoading}
-                className="flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[10px] border border-white/[0.12] bg-white/[0.06] text-[14.5px] font-semibold text-white outline-none transition cursor-pointer hover:border-white/20 hover:bg-white/[0.1] focus:border-[#D2FF00] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isMsLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <>
-                    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden>
-                      <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-                      <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-                      <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-                      <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-                    </svg>
-                    Entrar com Microsoft
-                  </>
-                )}
-              </button>
-
-              <div className="mt-[26px] text-center text-[11px] tracking-[0.03em] text-[#8B8B95] opacity-55">
-                © 2026 GIO · Todos os direitos reservados
-              </div>
+              </motion.div>
             </div>
+          </main>
+        </div>
+
+        {/* ═══ RODAPÉ DE TELA INTEIRA: ancora as duas colunas ═══
+            Altura de 2 células do grid (140px): com a malha ancorada na base,
+            a divisória do rodapé cai exatamente numa linha do grid. */}
+        <footer className="relative z-10 hidden h-[140px] border-t border-white/[0.08] lg:grid lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="grid grid-cols-3 content-center gap-8 px-16 xl:px-24">
+            {DESTAQUES.map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.55 + index * 0.13, ease: 'easeOut' }}
+              >
+                <span className="block text-[14px] font-semibold text-white">{item.title}</span>
+                <span className="mt-1 block text-[13px] leading-[1.55] text-white/45">{item.desc}</span>
+              </motion.div>
+            ))}
           </div>
-        </main>
+          <div className="flex items-center justify-end px-16">
+            <span className="text-right text-[11px] tracking-[0.03em] text-white/30">
+              © 2026 GIO · Sistema protegido por autenticação segura
+            </span>
+          </div>
+        </footer>
       </div>
     </div>
   )
