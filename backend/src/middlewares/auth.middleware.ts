@@ -1,36 +1,23 @@
 import { Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { AuthRequest, UserRole } from '../types/index.js';
+import { supabaseGioAdmin } from '../config/supabase.js';
+import { resolverAutorizacao } from '../services/equipe.service.js';
 
 // Autenticacao via Supabase Auth da GIO: o frontend loga com o Supabase e envia
 // o access_token; aqui validamos o token com supabase.auth.getUser (o proprio
-// Supabase confirma a autenticidade) e autorizamos via public.gio_has_access
-// (mesma logica de canAccessX da GIO). Os usuarios sao os de public.profiles.
+// Supabase confirma a autenticidade). Autorizacao — fonte unica de papel:
+// acesso_pos_obra (GIO) permite entrar; o papel (GESTOR/TECNICO) vem de
+// pos_obra.membros; admin GIO e gestor automatico.
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
-// Papeis GIO que sempre entram (alem de quem tiver a permissao granular).
-const ROLES_ACESSO = ['admin'];
-
-// Client no contexto do usuario (carrega o token) para que auth.uid() resolva
-// dentro de gio_has_access e das policies.
+// Client so para validar o token do usuario (auth.getUser).
 function clientDoUsuario(token: string) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-}
-
-async function temPermissao(client: ReturnType<typeof clientDoUsuario>, perm: string): Promise<boolean> {
-  const { data, error } = await client.rpc('gio_has_access', {
-    allowed_roles: ROLES_ACESSO,
-    allowed_perms: [perm],
-  });
-  if (error) {
-    console.error(`Erro em gio_has_access(${perm}):`, error.message);
-    return false;
-  }
-  return data === true;
 }
 
 export const authMiddleware = async (
@@ -39,6 +26,12 @@ export const authMiddleware = async (
   next: NextFunction
 ) => {
   try {
+    // SUPABASE_SERVICE_KEY e obrigatoria: sem ela nao ha acesso aos dados do
+    // pos_obra (grants de anon revogados) nem resolucao de perfil/papel.
+    if (!supabaseGioAdmin) {
+      return res.status(503).json({ error: 'Backend mal configurado: SUPABASE_SERVICE_KEY ausente' });
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       return res.status(401).json({ error: 'Token nao fornecido' });
@@ -49,10 +42,8 @@ export const authMiddleware = async (
       return res.status(401).json({ error: 'Token mal formatado' });
     }
 
-    const client = clientDoUsuario(token);
-
     // Valida o token direto no Supabase (autenticidade garantida por ele).
-    const { data: auth, error: authError } = await client.auth.getUser(token);
+    const { data: auth, error: authError } = await clientDoUsuario(token).auth.getUser(token);
     if (authError || !auth.user) {
       return res.status(401).json({ error: 'Token invalido' });
     }
@@ -60,31 +51,25 @@ export const authMiddleware = async (
     const userId = auth.user.id;
     const emailAuth = auth.user.email;
 
-    // Perfil (nome + ativo). RLS permite o usuario ler o proprio profile.
-    const { data: profile } = await client
-      .from('profiles')
-      .select('name, ativo')
-      .eq('id', userId)
-      .single();
-
-    if (profile && profile.ativo === false) {
+    const autz = await resolverAutorizacao(userId);
+    if (!autz) {
+      return res.status(403).json({ error: 'Perfil nao encontrado na GIO' });
+    }
+    if (!autz.ativo) {
       return res.status(403).json({ error: 'Usuario desativado' });
     }
-
-    // Autorizacao pelo modulo Pos-Obra (permissoes da GIO).
-    const temAcesso = await temPermissao(client, 'acesso_pos_obra');
-    if (!temAcesso) {
+    if (!autz.temAcesso) {
       return res.status(403).json({ error: 'Sem acesso ao modulo Pos-Obra' });
     }
 
-    const podeGerenciar = await temPermissao(client, 'gerenciar_pos_obra');
+    const role: UserRole = autz.isAdminGio ? 'ADMIN' : autz.podeGerenciar ? 'COORDENADOR' : 'TECNICO';
 
     req.user = {
       id: userId,
-      nome: profile?.name || emailAuth || 'Usuario',
+      nome: autz.nome || emailAuth || 'Usuario',
       email: emailAuth || '',
-      role: podeGerenciar ? 'COORDENADOR' : 'TECNICO',
-      podeGerenciar,
+      role,
+      podeGerenciar: autz.podeGerenciar,
       ativo: true,
     };
 
@@ -96,8 +81,8 @@ export const authMiddleware = async (
 };
 
 /**
- * Exige que o usuario possa gerenciar (permissao gerenciar_pos_obra).
- * Substitui os antigos requireRoles('ADMIN'|'COORDENADOR').
+ * Exige que o usuario possa gerenciar (gestor definido na Equipe Tecnica ou
+ * admin GIO).
  */
 export const requireGerenciar = (req: AuthRequest, res: Response, next: NextFunction) => {
   if (!req.user) {
@@ -110,17 +95,16 @@ export const requireGerenciar = (req: AuthRequest, res: Response, next: NextFunc
 };
 
 /**
- * Compatibilidade: mantem a assinatura antiga requireRoles(...). Como so
- * existem os papeis derivados COORDENADOR (gerencia) e TECNICO, qualquer lista
- * que inclua ADMIN/COORDENADOR exige poder gerenciar.
+ * Papel exigido por rota. Admin GIO (role ADMIN) passa em qualquer checagem;
+ * demais precisam estar na lista (ex.: requireRoles('ADMIN') = so admin GIO).
  */
 export const requireRoles = (...roles: UserRole[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Nao autenticado' });
     }
-    const exigeGerenciar = roles.includes('ADMIN') || roles.includes('COORDENADOR');
-    if (exigeGerenciar && !req.user.podeGerenciar) {
+    const ok = req.user.role === 'ADMIN' || roles.includes(req.user.role);
+    if (!ok) {
       return res.status(403).json({ error: 'Acesso nao autorizado' });
     }
     next();

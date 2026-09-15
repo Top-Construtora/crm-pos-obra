@@ -12,6 +12,8 @@
 
 @layer base {
   :root {
+    /* Controles nativos (select/option, date, scrollbar) legiveis por tema. */
+    color-scheme: light;
     /* Minimal Theme Colors */
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
@@ -48,6 +50,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 0 0% 9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 12%;

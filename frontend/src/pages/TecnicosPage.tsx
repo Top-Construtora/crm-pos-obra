@@ -1,22 +1,11 @@
-import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, User } from 'lucide-react'
+import { ShieldCheck, Wrench, User, Info } from 'lucide-react'
 import { toast } from 'sonner'
-import { usersService } from '@/services/users.service'
+import { equipeService, MembroEquipe, PapelEquipe } from '@/services/equipe.service'
 import { usePermissions } from '@/hooks/usePermissions'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -24,197 +13,138 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { User as UserType, ROLE_LABELS, UserRole } from '@/types'
+
+// Equipe Tecnica: os usuarios vem da GIO (quem tem a permissao acesso_pos_obra).
+// Aqui o gestor define apenas o PAPEL de cada um no Pos-Obra:
+//  - GESTOR: ve tudo, cria/edita/atribui/finaliza e gerencia a equipe
+//  - TECNICO: atende os chamados atribuidos a ele
+// Admins da GIO sao gestores automaticos e nao aparecem na lista.
+// Criar/desativar usuarios e conceder acesso = Admin da GIO.
+
+const PAPEL_INFO: Record<PapelEquipe, { label: string; desc: string }> = {
+  GESTOR: { label: 'Gestor', desc: 'Vê e gerencia todos os chamados' },
+  TECNICO: { label: 'Técnico', desc: 'Atende os chamados atribuídos a ele' },
+}
 
 export default function TecnicosPage() {
   const queryClient = useQueryClient()
-  const { isAdmin } = usePermissions()
-  const [isOpen, setIsOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    nome: '',
-    email: '',
-    senha: '',
-    role: 'TECNICO' as UserRole,
+  const { user, hasRole } = usePermissions()
+  const podeGerenciar = hasRole('ADMIN', 'COORDENADOR')
+
+  const { data: equipe, isLoading, error } = useQuery({
+    queryKey: ['equipe'],
+    queryFn: equipeService.getEquipe,
+    enabled: podeGerenciar,
   })
 
-  const { data: users, isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersService.getAll,
-    enabled: isAdmin(),
-  })
-
-  const { data: tecnicos } = useQuery({
-    queryKey: ['tecnicos'],
-    queryFn: usersService.getTecnicos,
-    enabled: !isAdmin(),
-  })
-
-  const displayUsers = isAdmin() ? users : tecnicos
-
-  const createMutation = useMutation({
-    mutationFn: usersService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+  const papelMutation = useMutation({
+    mutationFn: ({ profileId, papel }: { profileId: string; papel: PapelEquipe }) =>
+      equipeService.setPapel(profileId, papel),
+    onSuccess: (_data, { papel }) => {
+      queryClient.invalidateQueries({ queryKey: ['equipe'] })
       queryClient.invalidateQueries({ queryKey: ['tecnicos'] })
-      toast.success('Usuario criado com sucesso')
-      handleClose()
+      toast.success(`Papel atualizado para ${PAPEL_INFO[papel].label}`)
     },
-    onError: (error: any) => toast.error(error.response?.data?.error || 'Erro ao criar usuario'),
+    onError: (err: any) =>
+      toast.error(err.response?.data?.error || 'Erro ao atualizar papel'),
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<UserType> }) =>
-      usersService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-      queryClient.invalidateQueries({ queryKey: ['tecnicos'] })
-      toast.success('Usuario atualizado')
-      handleClose()
-    },
-    onError: () => toast.error('Erro ao atualizar usuario'),
-  })
+  const getInitials = (name: string) =>
+    name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 
-  const deleteMutation = useMutation({
-    mutationFn: usersService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-      queryClient.invalidateQueries({ queryKey: ['tecnicos'] })
-      toast.success('Usuario desativado')
-      setDeleteId(null)
-    },
-    onError: () => toast.error('Erro ao desativar usuario'),
-  })
-
-  const handleOpen = (user?: UserType) => {
-    if (user) {
-      setEditingId(user.id)
-      setFormData({ nome: user.nome, email: user.email, senha: '', role: user.role })
-    } else {
-      setEditingId(null)
-      setFormData({ nome: '', email: '', senha: '', role: 'TECNICO' })
-    }
-    setIsOpen(true)
-  }
-
-  const handleClose = () => {
-    setIsOpen(false)
-    setEditingId(null)
-    setFormData({ nome: '', email: '', senha: '', role: 'TECNICO' })
-  }
-
-  const handleSubmit = () => {
-    if (!formData.nome || !formData.email) {
-      toast.error('Preencha nome e email')
-      return
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      toast.error('Email invalido')
-      return
-    }
-    if (!editingId && !formData.senha) {
-      toast.error('Senha e obrigatoria para novos usuarios')
-      return
-    }
-    if (formData.senha && formData.senha.length < 6) {
-      toast.error('Senha deve ter no minimo 6 caracteres')
-      return
-    }
-
-    const data: any = {
-      nome: formData.nome,
-      email: formData.email,
-      role: formData.role,
-    }
-    if (formData.senha) {
-      data.senha = formData.senha
-    }
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data })
-    } else {
-      createMutation.mutate(data)
-    }
-  }
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'ADMIN':
-        return 'destructive'
-      case 'COORDENADOR':
-        return 'warning'
-      default:
-        return 'secondary'
-    }
+  if (!podeGerenciar) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <ShieldCheck className="h-12 w-12 text-muted-foreground" />
+          <p className="mt-4 text-muted-foreground">
+            Apenas gestores podem gerenciar a equipe.
+          </p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
     <div className="space-y-6">
-      {isAdmin() && (
-        <div className="flex justify-end">
-          <Button onClick={() => handleOpen()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Usuario
-          </Button>
-        </div>
-      )}
+      {/* Como funciona */}
+      <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-4 text-sm">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sidebar-accent" />
+        <p className="text-muted-foreground">
+          A lista mostra quem tem acesso ao Pós-Obra (permissão concedida na{' '}
+          <span className="font-semibold text-foreground">GIO</span>). Aqui você define o{' '}
+          <span className="font-semibold text-foreground">papel</span> de cada pessoa:{' '}
+          <span className="font-semibold text-foreground">Gestor</span> vê e gerencia tudo;{' '}
+          <span className="font-semibold text-foreground">Técnico</span> atende os chamados
+          atribuídos a ele. Para incluir ou remover pessoas, ajuste as permissões na GIO.
+        </p>
+      </div>
 
       {isLoading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
-      ) : displayUsers && displayUsers.length > 0 ? (
+      ) : error ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <User className="h-12 w-12 text-muted-foreground" />
+            <p className="mt-4 text-muted-foreground">
+              {(error as any)?.response?.data?.error || 'Erro ao carregar a equipe'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : equipe && equipe.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {displayUsers.map((user) => (
-            <Card key={user.id}>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          {equipe.map((membro: MembroEquipe) => (
+            <Card key={membro.id}>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
                 <div className="flex items-center gap-3">
                   <Avatar>
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getInitials(user.nome)}
+                      {getInitials(membro.nome)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <CardTitle className="text-base">{user.nome}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <CardTitle className="text-base">{membro.nome}</CardTitle>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {membro.roleGio.replace(/_/g, ' ')} na GIO
+                    </p>
                   </div>
                 </div>
-                {isAdmin() && (
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleOpen(user)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteId(user.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent>
-                <Badge variant={getRoleColor(user.role) as any}>
-                  {ROLE_LABELS[user.role as keyof typeof ROLE_LABELS]}
+                <Badge variant={membro.papel === 'GESTOR' ? 'warning' : 'secondary'}>
+                  {membro.papel === 'GESTOR' ? (
+                    <ShieldCheck className="mr-1 h-3 w-3" />
+                  ) : (
+                    <Wrench className="mr-1 h-3 w-3" />
+                  )}
+                  {PAPEL_INFO[membro.papel].label}
                 </Badge>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Select
+                  value={membro.papel}
+                  onValueChange={(v) =>
+                    papelMutation.mutate({ profileId: membro.id, papel: v as PapelEquipe })
+                  }
+                  disabled={papelMutation.isPending || membro.id === user?.id}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(PAPEL_INFO) as [PapelEquipe, typeof PAPEL_INFO.GESTOR][]).map(
+                      ([papel, info]) => (
+                        <SelectItem key={papel} value={papel}>
+                          {info.label}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {PAPEL_INFO[membro.papel].desc}
+                  {membro.id === user?.id && ' · (você)'}
+                </p>
               </CardContent>
             </Card>
           ))}
@@ -223,93 +153,17 @@ export default function TecnicosPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <User className="h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">Nenhum usuário encontrado</p>
+            <p className="mt-4 text-muted-foreground text-center">
+              Nenhum usuário com acesso ao Pós-Obra.
+              <br />
+              <span className="text-sm">
+                Conceda a permissão <code className="text-foreground">acesso_pos_obra</code> na GIO
+                (Admin → Cargos/Usuários).
+              </span>
+            </p>
           </CardContent>
         </Card>
       )}
-
-      {/* Modal */}
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Usuario' : 'Novo Usuario'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nome</Label>
-              <Input
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{editingId ? 'Nova Senha (opcional)' : 'Senha'}</Label>
-              <Input
-                type="password"
-                value={formData.senha}
-                onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
-                placeholder={editingId ? 'Deixe em branco para manter' : ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Perfil</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(v) => setFormData({ ...formData, role: v as UserRole })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">Administrador</SelectItem>
-                  <SelectItem value="COORDENADOR">Coordenador</SelectItem>
-                  <SelectItem value="TECNICO">Tecnico</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {editingId ? 'Salvar' : 'Criar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Desativar usuário?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O usuário será desativado e não poderá mais acessar o sistema.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Desativar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

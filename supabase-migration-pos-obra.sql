@@ -16,9 +16,9 @@
 --
 -- PASSOS MANUAIS OBRIGATORIOS (uma vez, no fim):
 --   1) Project Settings > API > "Exposed schemas": adicione "pos_obra".
---   2) Crie as permissoes acesso_pos_obra e gerenciar_pos_obra no sistema de
---      permissoes da GIO e atribua aos cargos que devem usar o modulo.
---      (o backend autoriza via public.gio_has_access(...)).
+--   2) Atribua a permissao acesso_pos_obra (GIO) a quem deve ENTRAR no modulo.
+--      O papel Gestor/Tecnico e definido dentro do Pos-Obra (Equipe Tecnica ->
+--      pos_obra.membros); admin GIO e gestor automatico.
 -- =============================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -174,6 +174,19 @@ CREATE TABLE IF NOT EXISTS pos_obra.agenda_tecnica (
 );
 
 -- =============================================
+-- 10. MEMBROS (equipe do Pos-Obra)
+--     A GIO libera o acesso (acesso_pos_obra); o papel operacional
+--     (GESTOR/TECNICO) e definido aqui via tela Equipe Tecnica.
+--     Sem registro = TECNICO. Admins da GIO sao sempre gestores.
+-- =============================================
+CREATE TABLE IF NOT EXISTS pos_obra.membros (
+  profile_id UUID PRIMARY KEY,
+  role VARCHAR(20) NOT NULL DEFAULT 'TECNICO',
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- =============================================
 -- INDEXES para performance
 -- =============================================
 CREATE INDEX IF NOT EXISTS idx_chamados_empreendimento ON pos_obra.chamados(empreendimento_id);
@@ -211,6 +224,9 @@ CREATE OR REPLACE TRIGGER trg_settings_atualizado_em
 CREATE OR REPLACE TRIGGER trg_agenda_atualizado_em
   BEFORE UPDATE ON pos_obra.agenda_tecnica FOR EACH ROW EXECUTE FUNCTION pos_obra.update_atualizado_em();
 
+CREATE OR REPLACE TRIGGER trg_membros_atualizado_em
+  BEFORE UPDATE ON pos_obra.membros FOR EACH ROW EXECUTE FUNCTION pos_obra.update_atualizado_em();
+
 -- =============================================
 -- Dados iniciais (Settings padrao)
 -- =============================================
@@ -222,36 +238,42 @@ INSERT INTO pos_obra.settings (chave, valor) VALUES
 ON CONFLICT (chave) DO NOTHING;
 
 -- =============================================
--- GRANTS para o PostgREST (roles anon/authenticated)
--- O backend usa a anon key para os dados; a autorizacao real e feita no
--- Express (JWT do Supabase + gio_has_access).
+-- GRANTS para o PostgREST
+-- NUNCA conceder a `anon`: a anon key e publica e o schema fica exposto no
+-- PostgREST — acesso anonimo foi revogado na GIO (migration
+-- 20260721100000_pos_obra_revoke_anon). O backend acessa os dados com a
+-- SERVICE KEY (service_role, BYPASSRLS); a autorizacao de negocio e feita
+-- no Express (JWT do Supabase + gio_has_access).
 -- =============================================
-GRANT USAGE ON SCHEMA pos_obra TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA pos_obra TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA pos_obra TO anon, authenticated, service_role;
-GRANT ALL ON ALL FUNCTIONS IN SCHEMA pos_obra TO anon, authenticated, service_role;
+GRANT USAGE ON SCHEMA pos_obra TO authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA pos_obra TO authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA pos_obra TO authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA pos_obra TO authenticated, service_role;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA pos_obra
-  GRANT ALL ON TABLES TO anon, authenticated, service_role;
+  GRANT ALL ON TABLES TO authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA pos_obra
-  GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+  GRANT ALL ON SEQUENCES TO authenticated, service_role;
 
 -- =============================================
 -- RLS (Row Level Security)
--- Policies permissivas: o backend (anon key) acessa tudo; a seguranca de fato
--- vem do JWT do Supabase + gio_has_access no Express.
+-- O backend acessa via service_role (BYPASSRLS). As policies abaixo cobrem
+-- apenas `authenticated` (belt-and-suspenders; espelha a migration
+-- 20260721100000_pos_obra_revoke_anon da GIO). `anon` nao tem policy nem grant.
 -- =============================================
 DO $$
 DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'chamados','historicos','comentarios','vistorias','materiais',
-    'anexos','notificacoes','settings','agenda_tecnica'
+    'anexos','notificacoes','settings','agenda_tecnica','membros'
   ]
   LOOP
     EXECUTE format('ALTER TABLE pos_obra.%I ENABLE ROW LEVEL SECURITY;', t);
     EXECUTE format('DROP POLICY IF EXISTS "Allow all for anon" ON pos_obra.%I;', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON pos_obra.%I;', 'pos_obra_' || t || '_authenticated', t);
     EXECUTE format(
-      'CREATE POLICY "Allow all for anon" ON pos_obra.%I FOR ALL USING (true) WITH CHECK (true);', t);
+      'CREATE POLICY %I ON pos_obra.%I AS PERMISSIVE FOR ALL TO authenticated USING (true) WITH CHECK (true);',
+      'pos_obra_' || t || '_authenticated', t);
   END LOOP;
 END $$;

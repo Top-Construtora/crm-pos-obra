@@ -6,12 +6,18 @@ export const CREDENCIAIS = {
   tecnico: { email: 'joao@empresa.com', senha: 'tecnico123' },
 };
 
+/** Abre o formulario de email/senha, recolhido por padrao (o SSO Microsoft e o principal). */
+export async function abrirLoginEmail(page: Page) {
+  await page.goto('/login');
+  await page.getByRole('button', { name: 'Entrar com email e senha' }).click();
+}
+
 /** Faz login pela tela e aguarda o redirecionamento para o dashboard. */
 export async function login(
   page: Page,
   { email, senha }: { email: string; senha: string } = CREDENCIAIS.admin
 ) {
-  await page.goto('/login');
+  await abrirLoginEmail(page);
   await page.locator('#email').fill(email);
   await page.locator('#senha').fill(senha);
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
